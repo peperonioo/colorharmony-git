@@ -1006,14 +1006,11 @@ html[data-lang="en"] [data-view="wheel"], html[data-lang="en"] #btn-wheel{font-s
   html[data-mobile-perf="1"] .nav-btn{min-height:44px;}
   html[data-mobile-perf="1"] .compare-slots{gap:12px!important;}
   html[data-mobile-perf="1"] .cslot{padding:16px 12px!important;}
+  /* v10.1: canvas always pan-y on mobile. Items pointer-events:none — panel-only editing. */
   html[data-mobile-perf="1"] .test-canvas{touch-action:pan-y!important;}
-  html[data-mobile-perf="1"] .canvas-item{touch-action:pan-y!important;pointer-events:none;}
-  /* v10.0.4: canvas background stays pan-y in both preview and edit mode.
-     Items in edit mode use manipulation (allows tap-select, allows scroll, blocks double-tap-zoom).
-     touch-action:none is NEVER set on items — it permanently blocks scroll even after drag ends. */
-  html[data-mobile-perf="1"] .test-canvas.mobile-canvas-edit{touch-action:pan-y!important;}
-  html[data-mobile-perf="1"] .test-canvas.mobile-canvas-edit .canvas-item{touch-action:manipulation!important;pointer-events:auto;}
-  html[data-mobile-perf="1"] .test-canvas:not(.mobile-canvas-edit) .canvas-item{box-shadow:none!important;background:transparent!important;}
+  html[data-mobile-perf="1"] .canvas-artboard{touch-action:pan-y!important;}
+  html[data-mobile-perf="1"] .canvas-item{touch-action:pan-y!important;pointer-events:none!important;}
+  html[data-mobile-perf="1"] .canvas-item *{pointer-events:none!important;}
   .mobile-edit-toggle{display:none;}
   html[data-mobile-perf="1"] .mobile-edit-toggle{display:flex;position:sticky;top:8px;z-index:25;margin:0 0 10px auto;width:fit-content;align-items:center;gap:7px;border:1px solid var(--line);border-radius:999px;background:var(--bg-soft);color:var(--ink-dim);padding:9px 12px;font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:.12em;text-transform:uppercase;box-shadow:0 10px 24px rgba(0,0,0,.18);}
   html[data-mobile-perf="1"] .mobile-edit-toggle.is-on{border-color:var(--accent);background:var(--accent);color:#09090e;font-weight:800;}
@@ -1142,24 +1139,16 @@ html[data-lang="en"] [data-view="wheel"], html[data-lang="en"] #btn-wheel{font-s
    Canvas passive mode must behave like normal page content on mobile.
    Smear now exposes CSS/JS knobs through AppModules.NavSmearController. */
 @media(max-width:760px){
-  html[data-mobile-perf="1"] .test-canvas:not(.mobile-canvas-edit),
-  html[data-mobile-perf="1"] .test-canvas:not(.mobile-canvas-edit) .canvas-artboard{
+  /* v10.1: canvas always scrollable — no mode-gating. Items never interactive on mobile. */
+  html[data-mobile-perf="1"] .test-canvas,
+  html[data-mobile-perf="1"] .test-canvas .canvas-artboard{
     touch-action:pan-y!important;
-    -webkit-overflow-scrolling:touch;
   }
-  html[data-mobile-perf="1"] .test-canvas:not(.mobile-canvas-edit) .canvas-artboard{
-    pointer-events:auto!important;
-  }
-  html[data-mobile-perf="1"] .test-canvas:not(.mobile-canvas-edit) .canvas-item,
-  html[data-mobile-perf="1"] .test-canvas:not(.mobile-canvas-edit) .canvas-item *{
+  html[data-mobile-perf="1"] .test-canvas .canvas-item,
+  html[data-mobile-perf="1"] .test-canvas .canvas-item *{
     pointer-events:none!important;
-  }
-  /* v10.0.4: fix v8.9.1 override that was trapping scroll in edit mode.
-     Both the canvas and artboard must allow pan-y so the user can scroll past the canvas. */
-  html[data-mobile-perf="1"] .test-canvas.mobile-canvas-edit,
-  html[data-mobile-perf="1"] .test-canvas.mobile-canvas-edit .canvas-artboard{
-    touch-action:pan-y!important;
-    overscroll-behavior-y:contain;
+    user-select:none!important;
+    -webkit-user-select:none!important;
   }
   html[data-mobile-perf="1"] .top-nav{
     --smear-blur:3.2px;
@@ -1250,12 +1239,8 @@ html.identity-tour-picking .top-nav,html.identity-tour-picking header{opacity:1;
   .identity-tour-btn{padding:7px 8px;font-size:7.5px;}
   #view-canvas .canvas-layout{overflow:visible!important;touch-action:pan-y!important;overscroll-behavior-y:auto!important;}
   #view-canvas .canvas-stage,#view-canvas .canvas-panel{overflow:visible!important;}
+  /* v10.1: canvas always scrollable. No lock rules. No mobile contenteditable. */
   html[data-mobile-perf="1"] #test-canvas{touch-action:pan-y!important;overscroll-behavior-y:auto!important;}
-  /* v10.0.4: canvas scrolls in both modes; canvas-lock only restrains overscroll during active drag. */
-  html[data-mobile-perf="1"] #test-canvas.mobile-canvas-edit{touch-action:pan-y!important;}
-  /* v10.0.4: during active direct manipulation only — no overflow:hidden on body/html. */
-  html[data-mobile-lock="canvas"]{overscroll-behavior:contain;}
-  #canvas-artboard .canvas-editable{touch-action:manipulation!important;-webkit-user-select:text!important;user-select:text!important;caret-color:var(--accent);}
 }
 </style>
 
@@ -1500,6 +1485,8 @@ M -50,0 C -50,-28 -28,-50 0,-50 C 14,-50 25,-44 30,-35 C 35,-26 25,-18 15,-18 C 
 <h2>Lienzo</h2>
 <div class="sub">Usa el perfil cargado y los colores A/B seleccionados en Rueda Inspo.</div>
 <div id="canvas-control-content"></div>
+<!-- v10.0.4a: stable host for mobile panel — survives renderCanvasTest() innerHTML replacements -->
+<div id="canvas-mobile-controls-root"></div>
 </aside>
 </div>
 </div>
@@ -1529,7 +1516,7 @@ M -50,0 C -50,-28 -28,-50 0,-50 C 14,-50 25,-44 30,-35 C 35,-26 25,-18 15,-18 C 
 
 </div>
 <script>
-/* ── Color Harmony v10.0 — generated by build.js — do not edit directly ── */
+/* ── Color Harmony v10.1.1 — generated by build.js — do not edit directly ── */
 
 /* ── src/core/state.js ── */
 /* ── AppState v10.0 ── single source of truth ── */
@@ -8227,30 +8214,23 @@ if ('serviceWorker' in navigator) {
 
 
 
-/* ── src/modules/canvas-mobile.js ── */
-/* ── canvas-mobile.js — v10.0.4: Mobile Canvas Interaction Reset ──
-   Adds a panel-based editing UI for mobile canvas so users don't need to
-   tap/drag directly on the artboard.
-
-   WHAT THIS MODULE DOES:
-   1. Wraps window.selectCanvasItem  → keeps mobile panel in sync when item is selected.
-   2. Wraps window.renderCanvasTest  → re-injects the mobile panel after each re-render.
-   3. Wraps MI.setCanvasEdit         → shows/hides panel and updates labels on toggle.
-   4. Installs gesture-lock failsafe → releases canvas lock on touchend/cancel/pointercancel.
-
-   WHAT IT DOES NOT DO:
-   - Does not touch i18n, SmartMatch, profiles, wheel, settings, or onboarding.
-   - Does not break the existing desktop canvas controls (they remain untouched).
-   - Does not use contenteditable for text entry on mobile (panel textarea is used instead).
+/* ── src/modules/canvas/canvas-state.js ── */
+/* ── canvas-state.js — v10.1: shared canvas constants & helpers ──
+   Pure data / helpers. No side effects, no DOM access at definition time.
+   Consumed by canvas-render, canvas-desktop, canvas-mobile, canvas-index.
 */
 
-(function () {
+var CanvasState = (function () {
   'use strict';
 
-  /* ── Text item IDs (have contenteditable in HTML, support textarea editing) ── */
+  /* ── Item lists ── */
   var TEXT_ITEMS = ['canvas-title', 'canvas-kicker', 'canvas-copy', 'canvas-cta'];
+  var ALL_ITEMS  = [
+    'canvas-title','canvas-kicker','canvas-copy','canvas-cta',
+    'canvas-star-left','canvas-star-right','canvas-line-left','canvas-line-right'
+  ];
 
-  /* ── Bilingual element names ── */
+  /* ── Bilingual label maps ── */
   var ELEMENT_NAMES = {
     es: {
       'canvas-title':      'Titular',
@@ -8274,38 +8254,40 @@ if ('serviceWorker' in navigator) {
     }
   };
 
-  /* ── Bilingual UI labels ── */
   var UI_LABELS = {
-    es: {
-      element: 'Elemento',
-      none:    'Ninguno',
-      text:    'Texto',
-      posX:    'Pos X',
-      posY:    'Pos Y',
-      scale:   'Tamaño',
-      center:  'Centrar'
-    },
-    en: {
-      element: 'Element',
-      none:    'None',
-      text:    'Text',
-      posX:    'Pos X',
-      posY:    'Pos Y',
-      scale:   'Size',
-      center:  'Center'
-    }
+    es: { element:'Elemento', none:'Ninguno', text:'Texto', posX:'Pos X', posY:'Pos Y', scale:'Tamaño', center:'Centrar' },
+    en: { element:'Element',  none:'None',    text:'Text',  posX:'Pos X', posY:'Pos Y', scale:'Size',   center:'Center'  }
   };
 
-  /* ── Ordered item list — matches CANVAS_ITEMS in wheel.js ── */
-  var CANVAS_ITEM_IDS = [
-    'canvas-title', 'canvas-kicker', 'canvas-copy', 'canvas-cta',
-    'canvas-star-left', 'canvas-star-right', 'canvas-line-left', 'canvas-line-right'
-  ];
+  var TOGGLE_LABELS = {
+    es: { on:'Editar lienzo: ON', off:'Editar lienzo' },
+    en: { on:'Edit canvas: ON',   off:'Edit canvas'   }
+  };
 
-  /* ── Helpers ── */
+  /* ── Language ── */
   function getLang() {
     return localStorage.getItem('np_lang') === 'en' ? 'en' : 'es';
   }
+
+  /* ── Mobile detection: MobilePerf flag OR narrow viewport (DevTools fallback) ── */
+  function isMobile() {
+    try {
+      var MP = window.AppModules && window.AppModules.MobilePerf;
+      if (MP && MP.enabled) return true;
+    } catch (_) {}
+    try {
+      return !!(window.matchMedia && window.matchMedia('(max-width:760px)').matches);
+    } catch (_) {}
+    return false;
+  }
+
+  /* ── DOM: find currently selected item ── */
+  function getSelectedId() {
+    var sel = document.querySelector('.canvas-item.is-selected');
+    return sel ? sel.id : null;
+  }
+
+  function isTextItem(id) { return TEXT_ITEMS.indexOf(id) !== -1; }
 
   function elName(id) {
     var d = ELEMENT_NAMES[getLang()] || ELEMENT_NAMES.es;
@@ -8317,135 +8299,485 @@ if ('serviceWorker' in navigator) {
     return d[key] || key;
   }
 
-  function isMobile() {
+  /* ── Active profile resolver (multi-source, priority order) ──
+     1. AppState.getProfile().activeId  — set by every AppActions call
+     2. window.activeProfId             — set by wheel.js activateProfile + AppActions
+     3. localStorage.getItem(...)       — persistent fallback
+     Also syncs window.activeProfId when stale.
+  */
+  function getActiveProfileForCanvas() {
+    var id = null;
+
+    try {
+      var p = window.AppState && window.AppState.getProfile();
+      if (p && p.activeId) id = p.activeId;
+    } catch (_) {}
+
+    if (!id) {
+      try { if (window.activeProfId) id = window.activeProfId; } catch (_) {}
+    }
+
+    if (!id) {
+      try { id = localStorage.getItem('np_active_profile') || null; } catch (_) {}
+    }
+
+    if (!id) return null;
+
+    // Sync window.activeProfId if stale
+    try { if (window.activeProfId !== id) window.activeProfId = id; } catch (_) {}
+
+    // Profile list: AppState → getProfs() fallback
+    var profiles = null;
+    try {
+      var ps = window.AppState && window.AppState.getProfile();
+      if (ps && ps.profiles && ps.profiles.length) profiles = ps.profiles;
+    } catch (_) {}
+    if (!profiles || !profiles.length) {
+      try { if (typeof getProfs === 'function') profiles = getProfs() || []; } catch (_) {}
+    }
+    if (!profiles || !profiles.length) return null;
+
+    return profiles.find(function (p) { return String(p.id) === String(id); }) || null;
+  }
+
+  /* ── Public API ── */
+  return {
+    TEXT_ITEMS:               TEXT_ITEMS,
+    ALL_ITEMS:                ALL_ITEMS,
+    ELEMENT_NAMES:            ELEMENT_NAMES,
+    UI_LABELS:                UI_LABELS,
+    TOGGLE_LABELS:            TOGGLE_LABELS,
+    getLang:                  getLang,
+    isMobile:                 isMobile,
+    getSelectedId:            getSelectedId,
+    isTextItem:               isTextItem,
+    elName:                   elName,
+    ui:                       ui,
+    getActiveProfileForCanvas: getActiveProfileForCanvas
+  };
+
+})();
+
+
+
+/* ── src/modules/canvas/canvas-render.js ── */
+/* ── canvas-render.js — v10.1: canvas profile text resolver ──
+   CanvasRender.getProfileText() replaces window.canvasTextForProfile.
+   Reads profile from CanvasState.getActiveProfileForCanvas() (multi-source).
+   Returns bilingual { chip, kicker, title, copy }.
+   Depends on: CanvasState (canvas-state.js must be loaded first).
+*/
+
+var CanvasRender = (function () {
+  'use strict';
+
+  /* Returns the profile-aware text data for renderCanvasTest().
+     Mirrors the shape of the legacy canvasTextForProfile() return value. */
+  function getProfileText() {
+    var prof = CanvasState.getActiveProfileForCanvas();
+    var lang = CanvasState.getLang();
+
+    if (!prof) {
+      return {
+        chip:   lang === 'en' ? 'No active profile' : 'Sin perfil activo',
+        kicker: 'HOUSE & DISCO',
+        title:  'NU<br>AMOR',
+        copy:   'BYRON BAY'
+      };
+    }
+
+    return {
+      chip:   (lang === 'en' ? 'Profile: ' : 'Perfil: ') + prof.name,
+      kicker: (prof.tag || 'HOUSE & DISCO').toUpperCase(),
+      title:  (prof.name || 'TU PERFIL').toUpperCase().replace(/\s+/g, '<br>'),
+      copy:   lang === 'en' ? 'VISUAL DRAFT' : 'BOCETO VISUAL'
+    };
+  }
+
+  return { getProfileText: getProfileText };
+
+})();
+
+
+
+/* ── src/modules/canvas/canvas-gestures.js ── */
+/* ── canvas-gestures.js — v10.1: gesture lock management & failsafe ──
+   Handles releasing stale canvas gesture locks.
+   In v10.1, mobile canvas uses panel-only interaction — no MI.lock('canvas') calls
+   from the canvas system. This failsafe cleans up any stale lock that older paths
+   (e.g. the drag handler inside selectCanvasItem's resize handle) might set.
+   Depends on: nothing (uses window.AppModules directly).
+*/
+
+var CanvasGestures = (function () {
+  'use strict';
+
+  /* Release any canvas gesture lock regardless of which system acquired it. */
+  function releaseLock() {
+    try {
+      var MI = window.AppModules && window.AppModules.MobileInteraction;
+      if (MI && typeof MI.isLocked === 'function' && MI.isLocked('canvas')) {
+        MI.unlock('canvas');
+      }
+    } catch (_) {}
+    try {
+      var G = window.AppModules && window.AppModules.Gestures;
+      if (G && typeof G.release === 'function') G.release('canvas');
+    } catch (_) {}
+    try {
+      var html = document.documentElement;
+      if (html.dataset.mobileLock === 'canvas') delete html.dataset.mobileLock;
+    } catch (_) {}
+  }
+
+  /* Install document-level listeners that release canvas locks on gesture end.
+     Runs once at boot; safe to call even if DOM is not yet ready
+     (document.addEventListener works before DOMContentLoaded). */
+  function installFailsafe() {
+    document.addEventListener('touchend',      releaseLock, { passive: true, capture: true });
+    document.addEventListener('touchcancel',   releaseLock, { passive: true, capture: true });
+    document.addEventListener('pointercancel', releaseLock, { capture: true });
+    console.info('[CanvasGestures] failsafe installed');
+  }
+
+  return {
+    releaseLock:      releaseLock,
+    installFailsafe:  installFailsafe
+  };
+
+})();
+
+
+
+/* ── src/modules/canvas/canvas-desktop.js ── */
+/* ── canvas-desktop.js — v10.1: desktop canvas coordination ──
+   Owns desktop drag/resize/contenteditable by controlling when the legacy
+   bindSingleCanvasItem handlers are attached:
+     • On desktop: allows them (they are the correct desktop implementation).
+     • On mobile:  pre-sets el.dataset.dragReady='1' BEFORE the legacy bind runs,
+                   causing bindSingleCanvasItem to return early — zero legacy handlers on mobile.
+   Also wraps MI.setCanvasEdit to apply bilingual toggle text (Problem C from v10.0.4a).
+   Depends on: CanvasState (must load first).
+*/
+
+var CanvasDesktop = (function () {
+  'use strict';
+
+  /* ── Mobile isolation: pre-set dragReady on all EXISTING canvas items ──
+     Call this BEFORE the original renderCanvasTest() runs.
+     bindSingleCanvasItem checks `el.dataset.dragReady` and returns early if set.
+     This ensures no legacy pointer handlers are attached to items on mobile. */
+  function blockLegacyBinding() {
+    CanvasState.ALL_ITEMS.forEach(function (id) {
+      var el = document.getElementById(id);
+      if (el) el.dataset.dragReady = '1';
+    });
+    // Also cover any extra elements currently on the artboard
+    var board = document.getElementById('canvas-artboard');
+    if (board) {
+      board.querySelectorAll('.canvas-item').forEach(function (el) {
+        el.dataset.dragReady = '1';
+      });
+    }
+  }
+
+  /* ── Desktop: delegate to legacy bindCanvasControls ──
+     On desktop these controls (font select, size sliders, center/reset buttons)
+     are owned by wheel.js implementation. CanvasModule calls this after render. */
+  function bindControls() {
+    try {
+      if (typeof bindCanvasControls === 'function') bindCanvasControls();
+    } catch (e) {
+      console.warn('[CanvasDesktop] bindCanvasControls error:', e);
+    }
+  }
+
+  /* ── Wrap MI.setCanvasEdit for bilingual toggle text (Problem C) ──
+     Installed once at boot. Only touches the toggle button label — does not
+     change the panel visibility (panel is always visible in v10.1). */
+  function installEditToggleI18n() {
     var MI = window.AppModules && window.AppModules.MobileInteraction;
-    return !!(MI && MI.enabled);
+    if (!MI || typeof MI.setCanvasEdit !== 'function') return false;
+    var _orig = MI.setCanvasEdit.bind(MI);
+    MI.setCanvasEdit = function (on, opts) {
+      try { _orig(on, opts); } catch (_) {}
+      try {
+        var lang = CanvasState.getLang();
+        var tl   = CanvasState.TOGGLE_LABELS[lang] || CanvasState.TOGGLE_LABELS.es;
+        var btn  = document.getElementById('mobile-canvas-edit-toggle');
+        if (btn) btn.textContent = on ? tl.on : tl.off;
+      } catch (_) {}
+    };
+    console.info('[CanvasDesktop] setCanvasEdit hooked (i18n toggle text)');
+    return true;
   }
 
-  function isTextItem(id) {
-    return TEXT_ITEMS.indexOf(id) !== -1;
-  }
+  return {
+    blockLegacyBinding:    blockLegacyBinding,
+    bindControls:          bindControls,
+    installEditToggleI18n: installEditToggleI18n
+  };
 
-  /* ── Current selected item ── */
-  function getSelectedId() {
-    var sel = document.querySelector('.canvas-item.is-selected');
-    return sel ? sel.id : null;
-  }
+})();
 
-  /* ── Inject CSS once ── */
+
+
+/* ── src/modules/canvas/canvas-mobile.js ── */
+/* ── canvas-mobile.js — v10.1.1: mobile canvas panel ──
+   v10.1.1 changes vs v10.1:
+   1. Event delegation on #canvas-mobile-controls-root (not direct binding on children).
+      Delegation is installed ONCE during init() on the stable root and survives any
+      panel innerHTML rebuild.
+   2. Stronger CSS: pointer-events:auto!important on root + all descendants;
+      touch-action:manipulation on interactive controls.
+   3. lastPanelEvent / delegatedEventsInstalled exposed for __canvasMobileDebug.
+   4. bindPanelEvents() still called on inject for select value restore,
+      but all live event routing goes through delegation.
+   Depends on: CanvasState (canvas-state.js must load first).
+   The item update helpers are on window.CanvasModule (defined in canvas-index.js).
+*/
+
+var CanvasMobile = (function () {
+  'use strict';
+
+  /* ── module-level state ── */
+  var _lastPanelEvent         = null;
+  var _delegatedEventsInstalled = false;
+
+  /* ─────────────────────────────────────────────
+     CSS INJECTION
+  ───────────────────────────────────────────── */
   function injectCSS() {
-    if (document.getElementById('canvas-mobile-css')) return;
+    if (document.getElementById('canvas-v101-mobile-css')) return;
     var s = document.createElement('style');
-    s.id = 'canvas-mobile-css';
+    s.id = 'canvas-v101-mobile-css';
     s.textContent = [
-      /* Panel hidden by default; only shown on mobile */
-      '.canvas-mobile-panel{display:none;}',
-      'html[data-mobile-perf="1"] .canvas-mobile-panel{display:flex;flex-direction:column;gap:10px;padding:14px 0 6px;}',
-      /* Row layout */
+      /* Root: hidden on desktop, visible on mobile */
+      '#canvas-mobile-controls-root{display:none;}',
+      'html[data-mobile-perf="1"] #canvas-mobile-controls-root{display:block;}',
+      '@media(max-width:760px){#canvas-mobile-controls-root{display:block;}}',
+
+      /* CRITICAL: guarantee root + all descendants are interactive.
+         Without this, an ancestor with pointer-events:none would silence the panel. */
+      '#canvas-mobile-controls-root{pointer-events:auto!important;position:relative;z-index:20;}',
+      '#canvas-mobile-controls-root *{pointer-events:auto!important;}',
+
+      /* Panel layout */
+      '.canvas-mobile-panel{display:flex;flex-direction:column;gap:10px;padding:14px 0 6px;}',
+
+      /* Row */
       '.cmp-row{display:flex;align-items:center;gap:8px;}',
       '.cmp-label{font-family:\'JetBrains Mono\',monospace;font-size:9px;letter-spacing:.12em;' +
         'text-transform:uppercase;color:var(--ink-dim);flex-shrink:0;min-width:62px;}',
-      /* Select */
+
+      /* Select — manipulation so tap opens it without zoom */
       '.cmp-select{flex:1;background:var(--bg-soft);border:1px solid var(--line);' +
         'border-radius:8px;color:var(--ink);font-family:\'JetBrains Mono\',monospace;' +
-        'font-size:9px;letter-spacing:.06em;padding:7px 8px;' +
-        '-webkit-appearance:none;appearance:none;}',
-      /* Textarea */
+        'font-size:16px;letter-spacing:.06em;padding:7px 8px;' +
+        '-webkit-appearance:none;appearance:none;' +
+        'touch-action:manipulation!important;pointer-events:auto!important;}',
+
+      /* Textarea: manipulation prevents scroll trap; no contenteditable needed */
       '.cmp-textarea{flex:1;background:var(--bg-soft);border:1px solid var(--line);' +
         'border-radius:8px;color:var(--ink);font-family:\'JetBrains Mono\',monospace;' +
-        'font-size:9px;letter-spacing:.06em;padding:7px 8px;resize:none;' +
-        'min-height:48px;line-height:1.4;touch-action:manipulation;}',
-      /* Range */
+        'font-size:16px;letter-spacing:.06em;padding:7px 8px;resize:none;' +
+        'min-height:48px;line-height:1.4;' +
+        'touch-action:manipulation!important;pointer-events:auto!important;}',
+
+      /* Range sliders */
       '.cmp-range{flex:1;accent-color:var(--accent);cursor:pointer;' +
-        'touch-action:manipulation;}',
+        'touch-action:manipulation!important;pointer-events:auto!important;}',
       '.cmp-val{font-family:\'JetBrains Mono\',monospace;font-size:9px;' +
         'color:var(--ink-dim);min-width:24px;text-align:right;}',
+
       /* Center button */
       '.cmp-btn{flex:1;background:var(--bg-soft);border:1px solid var(--line);' +
         'border-radius:8px;color:var(--ink-dim);font-family:\'JetBrains Mono\',monospace;' +
         'font-size:9px;letter-spacing:.1em;text-transform:uppercase;' +
-        'padding:8px 10px;cursor:pointer;text-align:center;touch-action:manipulation;}',
+        'padding:8px 10px;cursor:pointer;text-align:center;' +
+        'touch-action:manipulation!important;pointer-events:auto!important;}',
       '.cmp-btn:active{background:var(--accent);color:#09090e;border-color:var(--accent);}',
+
       /* Divider */
-      '.cmp-divider{height:1px;background:var(--line);opacity:.35;margin:2px 0;}'
+      '.cmp-divider{height:1px;background:var(--line);opacity:.35;margin:2px 0;}',
+
+      /* Ensure no edit toggle ever shows */
+      '#mobile-canvas-edit-toggle,.mobile-edit-toggle{display:none!important;visibility:hidden!important;pointer-events:none!important;}'
     ].join('\n');
     document.head.appendChild(s);
   }
 
-  /* ── Build panel HTML ── */
+  /* ─────────────────────────────────────────────
+     PANEL HTML
+  ───────────────────────────────────────────── */
   function panelHTML() {
-    var opts = '<option value="">' + ui('none') + '</option>' +
-      CANVAS_ITEM_IDS.map(function (id) {
-        return '<option value="' + id + '">' + elName(id) + '</option>';
+    var opts = '<option value="">' + CanvasState.ui('none') + '</option>' +
+      CanvasState.ALL_ITEMS.map(function (id) {
+        return '<option value="' + id + '">' + CanvasState.elName(id) + '</option>';
       }).join('');
 
     return [
       '<div class="cmp-row">',
-        '<span class="cmp-label">', ui('element'), '</span>',
+        '<span class="cmp-label">', CanvasState.ui('element'), '</span>',
         '<select class="cmp-select" id="cmp-el-sel">', opts, '</select>',
       '</div>',
       '<div class="cmp-divider"></div>',
-      /* Text row — shown only when a text item is selected */
       '<div class="cmp-row" id="cmp-text-row" style="display:none;align-items:flex-start;">',
-        '<span class="cmp-label" style="padding-top:6px;">', ui('text'), '</span>',
+        '<span class="cmp-label" style="padding-top:6px;">', CanvasState.ui('text'), '</span>',
         '<textarea class="cmp-textarea" id="cmp-text-inp" rows="2"></textarea>',
       '</div>',
-      /* X position */
       '<div class="cmp-row">',
-        '<span class="cmp-label">', ui('posX'), '</span>',
+        '<span class="cmp-label">', CanvasState.ui('posX'), '</span>',
         '<input class="cmp-range" id="cmp-x" type="range" min="0" max="100" step="1" value="50">',
         '<span class="cmp-val" id="cmp-xv">50</span>',
       '</div>',
-      /* Y position */
       '<div class="cmp-row">',
-        '<span class="cmp-label">', ui('posY'), '</span>',
+        '<span class="cmp-label">', CanvasState.ui('posY'), '</span>',
         '<input class="cmp-range" id="cmp-y" type="range" min="0" max="100" step="1" value="50">',
         '<span class="cmp-val" id="cmp-yv">50</span>',
       '</div>',
-      /* Scale */
       '<div class="cmp-row">',
-        '<span class="cmp-label">', ui('scale'), '</span>',
+        '<span class="cmp-label">', CanvasState.ui('scale'), '</span>',
         '<input class="cmp-range" id="cmp-sc" type="range" min="35" max="260" step="1" value="100">',
         '<span class="cmp-val" id="cmp-scv">100</span>',
       '</div>',
-      /* Center button */
       '<div class="cmp-row">',
-        '<button class="cmp-btn" id="cmp-ctr">', ui('center'), '</button>',
+        '<button class="cmp-btn" id="cmp-ctr">', CanvasState.ui('center'), '</button>',
       '</div>'
     ].join('');
   }
 
-  /* ── Inject panel into the canvas-panel aside ── */
-  function injectPanel() {
-    if (document.getElementById('canvas-mobile-panel')) return;
-
+  /* ─────────────────────────────────────────────
+     STABLE ROOT
+  ───────────────────────────────────────────── */
+  function ensureRoot() {
+    var root = document.getElementById('canvas-mobile-controls-root');
+    if (root) return root;
+    /* Fallback: root was not in template HTML — create it after canvas-control-content */
     var controls = document.getElementById('canvas-control-content');
-    if (!controls) return;
+    if (!controls) return null;
+    root = document.createElement('div');
+    root.id = 'canvas-mobile-controls-root';
+    controls.parentNode.insertBefore(root, controls.nextSibling);
+    return root;
+  }
 
+  /* ─────────────────────────────────────────────
+     EVENT DELEGATION — installed ONCE on the stable root
+     Survives any panel innerHTML replacement.
+  ───────────────────────────────────────────── */
+  function installDelegatedEvents(root) {
+    if (root.dataset.cmpDelegated) return;
+    root.dataset.cmpDelegated = '1';
+
+    function track(type, id) {
+      _lastPanelEvent = type + ':' + id + '@' + Date.now();
+    }
+
+    /* input — text, X, Y, scale */
+    root.addEventListener('input', function (e) {
+      var tid = e.target && e.target.id;
+      if (!tid) return;
+      track('input', tid);
+      var selId = CanvasState.getSelectedId();
+
+      if (tid === 'cmp-text-inp') {
+        if (!selId) return;
+        var CM = window.CanvasModule;
+        if (CM && CM._updateItemText) CM._updateItemText(selId, e.target.value);
+
+      } else if (tid === 'cmp-x') {
+        var v = parseFloat(e.target.value);
+        var xv = document.getElementById('cmp-xv');
+        if (xv) xv.textContent = Math.round(v);
+        if (!selId) return;
+        var CM = window.CanvasModule;
+        if (CM && CM._updateItemPosition) CM._updateItemPosition(selId, v, undefined);
+
+      } else if (tid === 'cmp-y') {
+        var v = parseFloat(e.target.value);
+        var yv = document.getElementById('cmp-yv');
+        if (yv) yv.textContent = Math.round(v);
+        if (!selId) return;
+        var CM = window.CanvasModule;
+        if (CM && CM._updateItemPosition) CM._updateItemPosition(selId, undefined, v);
+
+      } else if (tid === 'cmp-sc') {
+        var sc = Math.max(35, Math.min(260, parseFloat(e.target.value)));
+        var scv = document.getElementById('cmp-scv');
+        if (scv) scv.textContent = Math.round(sc);
+        if (!selId) return;
+        var CM = window.CanvasModule;
+        if (CM && CM._updateItemScale) CM._updateItemScale(selId, sc);
+      }
+    }, false);
+
+    /* change — element dropdown */
+    root.addEventListener('change', function (e) {
+      var tid = e.target && e.target.id;
+      if (!tid) return;
+      track('change', tid);
+
+      if (tid === 'cmp-el-sel') {
+        var id = e.target.value || null;
+        /* Goes through CanvasModule.selectElement → legacy selectCanvasItem → .is-selected */
+        if (typeof window.selectCanvasItem === 'function') window.selectCanvasItem(id);
+        /* Sync panel directly too in case the hook is slow */
+        syncPanel(id);
+      }
+    }, false);
+
+    /* click — center button */
+    root.addEventListener('click', function (e) {
+      var tid = e.target && e.target.id;
+      if (!tid) return;
+      track('click', tid);
+
+      if (tid === 'cmp-ctr') {
+        var selId = CanvasState.getSelectedId();
+        if (!selId) return;
+        var CM = window.CanvasModule;
+        if (CM && CM._updateItemPosition) {
+          CM._updateItemPosition(selId, 50, undefined, true /* center=true */);
+        }
+        var xIn = document.getElementById('cmp-x');
+        var xV  = document.getElementById('cmp-xv');
+        if (xIn) xIn.value = 50;
+        if (xV)  xV.textContent = '50';
+        /* Re-select to refresh toolbar position */
+        if (typeof window.selectCanvasItem === 'function') window.selectCanvasItem(selId);
+      }
+    }, false);
+
+    _delegatedEventsInstalled = true;
+    console.info('[CanvasMobile] delegated events installed on #canvas-mobile-controls-root');
+  }
+
+  /* ─────────────────────────────────────────────
+     PANEL INJECT / SYNC
+  ───────────────────────────────────────────── */
+
+  function injectPanel() {
+    var root = ensureRoot();
+    if (!root) return null;
+    /* Install delegation once on the root (even before panel content exists) */
+    installDelegatedEvents(root);
+    /* If panel already exists inside root, keep it */
+    var existing = document.getElementById('canvas-mobile-panel');
+    if (existing && root.contains(existing)) return existing;
+    /* Build fresh panel */
     var panel = document.createElement('div');
     panel.className = 'canvas-mobile-panel';
     panel.id = 'canvas-mobile-panel';
     panel.innerHTML = panelHTML();
-
-    /* Insert directly after #canvas-control-content */
-    controls.parentNode.insertBefore(panel, controls.nextSibling);
-    bindPanelEvents(panel);
+    root.innerHTML = '';
+    root.appendChild(panel);
+    /* Re-install delegation after root.innerHTML change clears data attribute */
+    delete root.dataset.cmpDelegated;
+    installDelegatedEvents(root);
+    return panel;
   }
 
-  /* ── Refresh panel after a re-render clears #canvas-control-content ── */
-  function refreshPanel() {
-    var existing = document.getElementById('canvas-mobile-panel');
-    if (existing) {
-      /* Panel survived; just sync values */
-      syncPanel(getSelectedId());
-      return;
-    }
-    /* Panel was wiped — re-inject */
-    injectPanel();
-    syncPanel(getSelectedId());
-  }
-
-  /* ── Sync panel inputs to a selected item ── */
   function syncPanel(id) {
     var sel    = document.getElementById('cmp-el-sel');
     var textRw = document.getElementById('cmp-text-row');
@@ -8469,245 +8801,496 @@ if ('serviceWorker' in navigator) {
     var y  = parseFloat(el.dataset.y  || 50);
     var sc = Math.round(parseFloat(el.dataset.scale || '1') * 100);
 
-    if (xIn)  xIn.value           = Math.round(x);
-    if (xV)   xV.textContent      = Math.round(x);
-    if (yIn)  yIn.value           = Math.round(y);
-    if (yV)   yV.textContent      = Math.round(y);
-    if (scIn) scIn.value          = sc;
-    if (scV)  scV.textContent     = sc;
+    if (xIn)  xIn.value      = Math.round(x);
+    if (xV)   xV.textContent = Math.round(x);
+    if (yIn)  yIn.value      = Math.round(y);
+    if (yV)   yV.textContent = Math.round(y);
+    if (scIn) scIn.value      = sc;
+    if (scV)  scV.textContent = sc;
 
-    var txt = isTextItem(id);
-    if (textRw) textRw.style.display = txt ? 'flex' : 'none';
-    if (txt && textIn) {
-      /* Use textContent so we get plain text without HTML tags */
-      textIn.value = el.textContent || '';
-    }
+    var isText = CanvasState.isTextItem(id);
+    if (textRw) textRw.style.display = isText ? 'flex' : 'none';
+    if (isText && textIn) textIn.value = el.textContent || '';
   }
 
-  /* ── Sync the desktop "selected scale" sliders in the main controls ── */
-  function syncDesktopScale(id) {
-    if (!id) return;
-    var el = document.getElementById(id);
-    if (!el) return;
-    var sc = Math.round(parseFloat(el.dataset.scale || '1') * 100);
-    var ss  = document.getElementById('canvas-selected-scale');
-    var ssn = document.getElementById('canvas-selected-scale-num');
-    if (ss)  ss.value  = sc;
-    if (ssn) ssn.value = sc;
+  /* ─────────────────────────────────────────────
+     PUBLIC
+  ───────────────────────────────────────────── */
+
+  function refreshPanel() {
+    if (!CanvasState.isMobile()) return;
+    var panel = injectPanel();
+    if (panel) syncPanel(CanvasState.getSelectedId());
   }
 
-  /* ── Bind all panel input events ── */
-  function bindPanelEvents(panel) {
-    var selEl   = panel.querySelector('#cmp-el-sel');
-    var textIn  = panel.querySelector('#cmp-text-inp');
-    var xIn     = panel.querySelector('#cmp-x');
-    var xV      = panel.querySelector('#cmp-xv');
-    var yIn     = panel.querySelector('#cmp-y');
-    var yV      = panel.querySelector('#cmp-yv');
-    var scIn    = panel.querySelector('#cmp-sc');
-    var scV     = panel.querySelector('#cmp-scv');
-    var ctrBtn  = panel.querySelector('#cmp-ctr');
-
-    /* Element selector */
-    if (selEl) {
-      selEl.addEventListener('change', function () {
-        var id = selEl.value || null;
-        if (typeof window.selectCanvasItem === 'function') {
-          window.selectCanvasItem(id);
-        }
-        syncPanel(id);
-      });
-    }
-
-    /* Text textarea — live update, no contenteditable involved */
-    if (textIn) {
-      textIn.addEventListener('input', function () {
-        var id = getSelectedId();
-        if (!id) return;
-        var el = document.getElementById(id);
-        if (!el) return;
-        el.textContent = textIn.value;
-        el.dataset.userEdited = '1';
-      });
-    }
-
-    /* X slider */
-    if (xIn) {
-      xIn.addEventListener('input', function () {
-        var id = getSelectedId();
-        if (!id) return;
-        var el = document.getElementById(id);
-        if (!el) return;
-        var v = parseFloat(xIn.value);
-        el.dataset.x = v.toFixed(1);
-        if (xV) xV.textContent = Math.round(v);
-        if (typeof window.positionCanvasItem === 'function') window.positionCanvasItem(el);
-      });
-    }
-
-    /* Y slider */
-    if (yIn) {
-      yIn.addEventListener('input', function () {
-        var id = getSelectedId();
-        if (!id) return;
-        var el = document.getElementById(id);
-        if (!el) return;
-        var v = parseFloat(yIn.value);
-        el.dataset.y = v.toFixed(1);
-        if (yV) yV.textContent = Math.round(v);
-        if (typeof window.positionCanvasItem === 'function') window.positionCanvasItem(el);
-      });
-    }
-
-    /* Scale slider */
-    if (scIn) {
-      scIn.addEventListener('input', function () {
-        var id = getSelectedId();
-        if (!id) return;
-        var el = document.getElementById(id);
-        if (!el) return;
-        var sc = Math.max(35, Math.min(260, parseFloat(scIn.value)));
-        el.dataset.scale = (sc / 100).toFixed(2);
-        if (scV) scV.textContent = Math.round(sc);
-        if (typeof window.transformCanvasItem === 'function') window.transformCanvasItem(el);
-        syncDesktopScale(id);
-      });
-    }
-
-    /* Center button */
-    if (ctrBtn) {
-      ctrBtn.addEventListener('click', function () {
-        var id = getSelectedId();
-        if (!id) return;
-        var el = document.getElementById(id);
-        if (!el) return;
-        el.dataset.x      = '50';
-        el.dataset.center = 'true';
-        if (typeof window.positionCanvasItem === 'function') window.positionCanvasItem(el);
-        if (xIn) xIn.value = 50;
-        if (xV)  xV.textContent = '50';
-        /* Re-select to redraw toolbar handles at new position */
-        if (typeof window.selectCanvasItem === 'function') window.selectCanvasItem(id);
-      });
-    }
+  function rebuildForLang() {
+    if (!CanvasState.isMobile()) return;
+    var root = ensureRoot();
+    if (!root) return;
+    var panel = document.getElementById('canvas-mobile-panel');
+    if (!panel) return;
+    panel.innerHTML = panelHTML();
+    /* Delegation is on root — re-flag because root.innerHTML cleared the data attr above */
+    delete root.dataset.cmpDelegated;
+    installDelegatedEvents(root);
+    syncPanel(CanvasState.getSelectedId());
   }
 
-  /* ── Hook: wrap window.selectCanvasItem ── */
-  function installSelectHook() {
-    if (typeof window.selectCanvasItem !== 'function') return false;
-    var _orig = window.selectCanvasItem;
-    window.selectCanvasItem = function (id) {
-      try { _orig.call(this, id); } catch (_) {}
-      try {
-        if (isMobile()) {
-          var MI = window.AppModules && window.AppModules.MobileInteraction;
-          if (MI && MI.canvasEdit) syncPanel(id || null);
-        }
-      } catch (_) {}
-    };
-    console.info('[canvas-mobile] selectCanvasItem hooked');
-    return true;
-  }
-
-  /* ── Hook: wrap window.renderCanvasTest ── */
-  function installRenderHook() {
-    if (typeof window.renderCanvasTest !== 'function') return false;
-    var _orig = window.renderCanvasTest;
-    window.renderCanvasTest = function () {
-      try { _orig.apply(this, arguments); } catch (_) {}
-      try {
-        if (isMobile()) setTimeout(refreshPanel, 0);
-      } catch (_) {}
-    };
-    console.info('[canvas-mobile] renderCanvasTest hooked');
-    return true;
-  }
-
-  /* ── Hook: wrap MI.setCanvasEdit ── */
-  function installEditToggleHook() {
-    var MI = window.AppModules && window.AppModules.MobileInteraction;
-    if (!MI || typeof MI.setCanvasEdit !== 'function') return false;
-    var _orig = MI.setCanvasEdit.bind(MI);
-    MI.setCanvasEdit = function (on, opts) {
-      try { _orig(on, opts); } catch (_) {}
-      try {
-        var panel = document.getElementById('canvas-mobile-panel');
-        if (!panel) {
-          if (on) { injectPanel(); panel = document.getElementById('canvas-mobile-panel'); }
-        }
-        if (panel) panel.style.display = on ? 'flex' : 'none';
-        if (on) syncPanel(getSelectedId());
-      } catch (_) {}
-    };
-    console.info('[canvas-mobile] setCanvasEdit hooked');
-    return true;
-  }
-
-  /* ── Gesture-lock failsafe ── */
-  function installGestureLockFailsafe() {
-    function releaseLock() {
-      try {
-        var MI = window.AppModules && window.AppModules.MobileInteraction;
-        if (MI && typeof MI.isLocked === 'function' && MI.isLocked('canvas')) {
-          MI.unlock('canvas');
-        }
-        var G = window.AppModules && window.AppModules.Gestures;
-        if (G && typeof G.release === 'function') G.release('canvas');
-        var html = document.documentElement;
-        if (html.dataset.mobileLock === 'canvas') delete html.dataset.mobileLock;
-      } catch (_) {}
-    }
-    document.addEventListener('touchend',     releaseLock, { passive: true, capture: true });
-    document.addEventListener('touchcancel',  releaseLock, { passive: true, capture: true });
-    document.addEventListener('pointercancel', releaseLock, { capture: true });
-    console.info('[canvas-mobile] gesture-lock failsafe installed');
-  }
-
-  /* ── Language change: rebuild panel labels ── */
-  window.addEventListener('app:i18n-applied', function () {
-    try {
-      var panel = document.getElementById('canvas-mobile-panel');
-      if (!panel) return;
-      panel.innerHTML = panelHTML();
-      bindPanelEvents(panel);
-      syncPanel(getSelectedId());
-    } catch (_) {}
-  });
-
-  /* ── Boot with retry for late-defined globals ── */
-  function boot() {
+  function init() {
     injectCSS();
-    installGestureLockFailsafe();
+    /* Ensure root gets delegation installed as soon as DOM is ready */
+    function onReady() {
+      var root = ensureRoot();
+      if (root) installDelegatedEvents(root);
+      refreshPanel();
+      console.info('[CanvasMobile] v10.1.1 panel ready');
+    }
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', onReady, { once: true });
+    } else {
+      setTimeout(onReady, 0);
+    }
+  }
 
-    var hookedSel    = installSelectHook();
-    var hookedRender = installRenderHook();
-    var hookedToggle = installEditToggleHook();
+  return {
+    init:                   init,
+    refreshPanel:           refreshPanel,
+    rebuildForLang:         rebuildForLang,
+    syncPanel:              syncPanel,
+    injectPanel:            injectPanel,
+    /* debug accessors */
+    getLastPanelEvent:      function () { return _lastPanelEvent; },
+    isDelegatedInstalled:   function () { return _delegatedEventsInstalled; }
+  };
 
-    if (!hookedSel || !hookedRender || !hookedToggle) {
-      var tries = 0;
-      var poll = setInterval(function () {
-        tries++;
-        if (!hookedSel)    hookedSel    = installSelectHook();
-        if (!hookedRender) hookedRender = installRenderHook();
-        if (!hookedToggle) hookedToggle = installEditToggleHook();
-        if ((hookedSel && hookedRender && hookedToggle) || tries > 25) {
-          clearInterval(poll);
-          if (!hookedSel || !hookedRender || !hookedToggle) {
-            console.warn('[canvas-mobile] some hooks could not install after', tries, 'attempts',
-              { sel: hookedSel, render: hookedRender, toggle: hookedToggle });
+})();
+
+
+
+/* ── src/modules/canvas/canvas-index.js ── */
+/* ── canvas-index.js — v10.1.1: CanvasModule assembly & ownership enforcement ──
+   v10.1.1 changes vs v10.1:
+   1. _disableMICanvas() — kills MobileInteraction canvas edit path completely:
+        • MI.installCanvasToggle → no-op
+        • MI.setCanvasEdit      → no-op (logs info)
+        • MI.lock('canvas')     → returns false
+        • MutationObserver removes #mobile-canvas-edit-toggle the moment it appears
+          (MI's local installCanvasToggle() bypasses the API override)
+   2. CanvasModule.init() removes #mobile-canvas-edit-toggle at DOMContentLoaded.
+   3. No longer calls CanvasDesktop.installEditToggleI18n() — toggle is dead.
+   4. Internal item-update helpers added:
+        CanvasModule._updateItemText(id, text)
+        CanvasModule._updateItemPosition(id, x, y, center)
+        CanvasModule._updateItemScale(id, scalePercent)
+      Used by CanvasMobile delegation handlers instead of calling window.* wrappers.
+   5. __canvasMobileDebug extended with new fields.
+*/
+
+(function () {
+  'use strict';
+
+  /* ─────────────────────────────────────────────
+     SAVE ORIGINAL WHEEL.JS CANVAS FUNCTIONS
+  ───────────────────────────────────────────── */
+  var _origRenderCanvasTest    = window.renderCanvasTest;
+  var _origSelectCanvasItem    = window.selectCanvasItem;
+  var _origPositionCanvasItem  = window.positionCanvasItem;
+  var _origTransformCanvasItem = window.transformCanvasItem;
+
+  /* ─────────────────────────────────────────────
+     DISABLE MOBILEINTERACTION CANVAS PATH
+     MobileInteraction (v83-appcore.js) creates #mobile-canvas-edit-toggle and
+     calls setCanvasEdit() / lock('canvas') — all of which must be killed.
+     Problem: MI's install() calls the LOCAL installCanvasToggle() directly (not
+     through the API), so overriding MI.installCanvasToggle alone is insufficient.
+     Solution: override the API methods + use MutationObserver to remove the button
+     the moment it appears in the DOM.
+  ───────────────────────────────────────────── */
+  function _disableMICanvas() {
+    var MI = window.AppModules && window.AppModules.MobileInteraction;
+    if (!MI) {
+      console.warn('[CanvasModule] MobileInteraction not found — will retry at DOMContentLoaded');
+      return false;
+    }
+
+    /* Kill API methods — affects any caller going through the API object */
+    MI.installCanvasToggle = function () {
+      console.info('[MobileInteraction] canvas edit disabled — CanvasModule owns canvas');
+    };
+    MI.setCanvasEdit = function () {
+      console.info('[MobileInteraction] canvas edit disabled — CanvasModule owns canvas');
+    };
+
+    /* Intercept MI.lock to reject canvas-related keys */
+    var _origMILock = MI.lock;
+    MI.lock = function (owner) {
+      if (owner === 'canvas' || owner === 'canvas-resize') {
+        console.info('[MobileInteraction] canvas lock rejected — CanvasModule owns canvas');
+        return false;
+      }
+      return _origMILock ? _origMILock.call(this, owner) : false;
+    };
+
+    /* MutationObserver: the local installCanvasToggle() inside the IIFE calls
+       document.createElement and panel.insertBefore directly — it bypasses our
+       API override. Catch the node the moment it appears and remove it. */
+    try {
+      var _miObserver = new MutationObserver(function (mutations) {
+        for (var i = 0; i < mutations.length; i++) {
+          var added = mutations[i].addedNodes;
+          for (var j = 0; j < added.length; j++) {
+            var node = added[j];
+            if (node && node.nodeType === 1 && node.id === 'mobile-canvas-edit-toggle') {
+              try { node.parentNode && node.parentNode.removeChild(node); } catch (_) {}
+              console.info('[CanvasModule] removed #mobile-canvas-edit-toggle from DOM');
+            }
           }
         }
-      }, 200);
+      });
+      _miObserver.observe(document.documentElement, { childList: true, subtree: true });
+      window.__canvasMIObserver = _miObserver; /* expose for cleanup if needed */
+    } catch (e) {
+      console.warn('[CanvasModule] MutationObserver failed:', e);
     }
 
-    console.info('[canvas-mobile] v10.0.4 Mobile Canvas Interaction Reset loaded');
+    /* Mark on MI so debug can confirm */
+    MI._canvasDisabledByCanvasModule = true;
+    console.info('[MobileInteraction] canvas edit path disabled — CanvasModule owns canvas');
+    return true;
   }
 
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', boot, { once: true });
-  } else {
-    setTimeout(boot, 0);
+  /* ─────────────────────────────────────────────
+     CANVASMODULE PUBLIC API
+  ───────────────────────────────────────────── */
+  var CanvasModule = {
+
+    /* ── render() ── */
+    render: function () {
+      if (CanvasState.isMobile()) {
+        CanvasDesktop.blockLegacyBinding();
+      }
+      try {
+        if (typeof _origRenderCanvasTest === 'function') _origRenderCanvasTest();
+      } catch (e) {
+        console.error('[CanvasModule] render error:', e);
+      }
+      if (CanvasState.isMobile()) {
+        setTimeout(function () { CanvasMobile.refreshPanel(); }, 0);
+      }
+    },
+
+    /* ── selectElement(id) ── */
+    selectElement: function (id) {
+      try {
+        if (typeof _origSelectCanvasItem === 'function') _origSelectCanvasItem(id);
+      } catch (e) {
+        console.error('[CanvasModule] selectElement error:', e);
+      }
+      if (CanvasState.isMobile()) {
+        CanvasMobile.syncPanel(id || null);
+      }
+    },
+
+    /* ── _updateItemText(id, text) — direct text update, no full re-render ── */
+    _updateItemText: function (id, text) {
+      var el = document.getElementById(id);
+      if (!el) return;
+      el.textContent = text;
+      el.dataset.userEdited = '1';
+    },
+
+    /* ── _updateItemPosition(id, x, y, center) — update dataset then re-position ──
+       x and/or y may be undefined (only updates the provided axis).
+       center=true forces data-center=true (used by the center button). */
+    _updateItemPosition: function (id, x, y, center) {
+      var el = document.getElementById(id);
+      if (!el) return;
+      if (x !== undefined) {
+        el.dataset.x = parseFloat(x).toFixed(1);
+        /* If user is manually setting X, clear center flag unless centering explicitly */
+        if (!center && Math.round(parseFloat(x)) !== 50) {
+          delete el.dataset.center;
+        }
+      }
+      if (y !== undefined) {
+        el.dataset.y = parseFloat(y).toFixed(1);
+      }
+      if (center) {
+        el.dataset.center = 'true';
+      }
+      /* Call original positionCanvasItem directly (bypasses our wrapper to avoid
+         triggering syncPanel in a loop when called FROM the panel event) */
+      try {
+        if (typeof _origPositionCanvasItem === 'function') _origPositionCanvasItem(el);
+      } catch (_) {}
+    },
+
+    /* ── _updateItemScale(id, scalePercent) — scale in 0–260 range ── */
+    _updateItemScale: function (id, scalePercent) {
+      var el = document.getElementById(id);
+      if (!el) return;
+      var sc = Math.max(35, Math.min(260, scalePercent));
+      el.dataset.scale = (sc / 100).toFixed(2);
+      try {
+        if (typeof _origTransformCanvasItem === 'function') _origTransformCanvasItem(el);
+      } catch (_) {}
+      /* Keep desktop scale sliders in sync */
+      var ss  = document.getElementById('canvas-selected-scale');
+      var ssn = document.getElementById('canvas-selected-scale-num');
+      if (ss)  ss.value  = Math.round(sc);
+      if (ssn) ssn.value = Math.round(sc);
+    },
+
+    /* ── updateElement(id, patch) — general patch ── */
+    updateElement: function (id, patch) {
+      if (!id || !patch) return;
+      if (patch.text   !== undefined) CanvasModule._updateItemText(id, patch.text);
+      if (patch.x      !== undefined || patch.y !== undefined) {
+        CanvasModule._updateItemPosition(id, patch.x, patch.y, patch.center);
+      }
+      if (patch.scale  !== undefined) CanvasModule._updateItemScale(id, patch.scale * 100);
+    },
+
+    /* ── resetElement(id) ── */
+    resetElement: function (id) {
+      var defaults = {
+        'canvas-star-left':  { x:14, y:24, center:false, scale:1 },
+        'canvas-star-right': { x:86, y:24, center:false, scale:1 },
+        'canvas-title':      { x:50, y:22, center:true,  scale:1 },
+        'canvas-kicker':     { x:50, y:62, center:true,  scale:1 },
+        'canvas-line-left':  { x:18, y:73, center:false, scale:1 },
+        'canvas-copy':       { x:50, y:70, center:true,  scale:1 },
+        'canvas-line-right': { x:66, y:73, center:false, scale:1 },
+        'canvas-cta':        { x:50, y:82, center:true,  scale:1 }
+      };
+      var d = defaults[id];
+      if (!d) return;
+      CanvasModule._updateItemPosition(id, d.x, d.y, d.center);
+      CanvasModule._updateItemScale(id, d.scale * 100);
+    },
+
+    syncFromProfile: function () { CanvasModule.render(); },
+    syncFromColors:  function () { CanvasModule.render(); },
+
+    getState: function () {
+      var MI = window.AppModules && window.AppModules.MobileInteraction;
+      return {
+        selectedElementId: CanvasState.getSelectedId(),
+        isMobile:          CanvasState.isMobile(),
+        canvasEditMode:    !!(MI && MI.canvasEdit),
+        activeProfile:     CanvasState.getActiveProfileForCanvas()
+      };
+    },
+
+    isMobile: function () { return CanvasState.isMobile(); },
+
+    /* ── destroyLegacyHandlers() — clone-strip on mobile ── */
+    destroyLegacyHandlers: function () {
+      if (!CanvasState.isMobile()) return;
+      CanvasState.ALL_ITEMS.forEach(function (id) {
+        var el = document.getElementById(id);
+        if (!el) return;
+        var clone = el.cloneNode(true);
+        clone.dataset.dragReady = '1';
+        el.parentNode.replaceChild(clone, el);
+      });
+      console.info('[CanvasModule] legacy handlers destroyed (mobile)');
+    },
+
+    /* ── init() — single boot entry point ── */
+    init: function () {
+      /* 1. Kill MobileInteraction canvas path FIRST (synchronous) */
+      _disableMICanvas();
+
+      /* 2. Install global function replacements */
+      _installGlobalReplacements();
+
+      /* 3. Wrap AppActions.activateProfile */
+      _installActivateProfileHook();
+
+      /* 4. Gesture failsafe */
+      CanvasGestures.installFailsafe();
+
+      /* 5. Boot mobile panel */
+      CanvasMobile.init();
+
+      /* 6. i18n listener */
+      _registerI18nListener();
+
+      /* 7. DOM-ready cleanup (remove toggle if MI's local function already ran) */
+      function _domCleanup() {
+        var toggle = document.getElementById('mobile-canvas-edit-toggle');
+        if (toggle) {
+          try { toggle.parentNode && toggle.parentNode.removeChild(toggle); } catch (_) {}
+          console.info('[CanvasModule] removed stale #mobile-canvas-edit-toggle at DOM ready');
+        }
+        /* Also retry disabling MI in case it wasn't registered yet at script eval time */
+        var MI = window.AppModules && window.AppModules.MobileInteraction;
+        if (MI && !MI._canvasDisabledByCanvasModule) _disableMICanvas();
+      }
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', _domCleanup, { once: true });
+      } else {
+        setTimeout(_domCleanup, 0);
+      }
+
+      console.info('[CanvasModule] v10.1.1 initialized');
+    },
+
+    debug: function () { return window.__canvasDebug && window.__canvasDebug(); }
+  };
+
+  /* ─────────────────────────────────────────────
+     GLOBAL FUNCTION REPLACEMENTS
+  ───────────────────────────────────────────── */
+  function _installGlobalReplacements() {
+    window.canvasTextForProfile = function () {
+      return CanvasRender.getProfileText();
+    };
+
+    window.renderCanvasTest = function () {
+      return CanvasModule.render();
+    };
+
+    window.selectCanvasItem = function (id) {
+      return CanvasModule.selectElement(id);
+    };
+
+    window.positionCanvasItem = function (el) {
+      try {
+        if (typeof _origPositionCanvasItem === 'function') _origPositionCanvasItem(el);
+      } catch (_) {}
+      if (CanvasState.isMobile() && el && el.id) {
+        CanvasMobile.syncPanel(el.id);
+      }
+    };
+
+    window.transformCanvasItem = function (el) {
+      try {
+        if (typeof _origTransformCanvasItem === 'function') _origTransformCanvasItem(el);
+      } catch (_) {}
+      if (CanvasState.isMobile() && el && el.id) {
+        CanvasMobile.syncPanel(el.id);
+      }
+    };
+
+    console.info('[CanvasModule] global canvas functions replaced');
   }
+
+  /* ─────────────────────────────────────────────
+     ACTIVATE PROFILE HOOK
+  ───────────────────────────────────────────── */
+  function _installActivateProfileHook() {
+    if (!window.AppActions || typeof window.AppActions.activateProfile !== 'function') {
+      console.warn('[CanvasModule] AppActions.activateProfile not available — skipping hook');
+      return;
+    }
+    var _origActivate = window.AppActions.activateProfile;
+    window.AppActions.activateProfile = function (id) {
+      var result;
+      try { result = _origActivate.call(window.AppActions, id); } catch (_) {}
+      try {
+        var p = window.AppState && window.AppState.getProfile();
+        if (p && p.activeId !== undefined) window.activeProfId = p.activeId;
+      } catch (_) {}
+      try { CanvasModule.render(); } catch (_) {}
+      return result;
+    };
+    console.info('[CanvasModule] AppActions.activateProfile hooked');
+  }
+
+  /* ─────────────────────────────────────────────
+     I18N LISTENER
+  ───────────────────────────────────────────── */
+  function _registerI18nListener() {
+    window.addEventListener('app:i18n-applied', function () {
+      try { CanvasMobile.rebuildForLang(); } catch (_) {}
+    });
+  }
+
+  /* ─────────────────────────────────────────────
+     DEBUG HELPERS
+  ───────────────────────────────────────────── */
+  window.__canvasDebug = function () {
+    var result = CanvasModule.getState();
+    console.table(result);
+    return result;
+  };
+
+  window.__canvasMobileDebug = function () {
+    var MI  = window.AppModules && window.AppModules.MobileInteraction;
+    var prof = CanvasState.getActiveProfileForCanvas();
+
+    var root  = document.getElementById('canvas-mobile-controls-root');
+    var panel = document.getElementById('canvas-mobile-panel');
+    var panelVisible = false;
+    if (panel) {
+      try {
+        var cs = window.getComputedStyle(panel);
+        panelVisible = cs.display !== 'none' && cs.visibility !== 'hidden';
+      } catch (_) {}
+    }
+
+    function getTA(el)  { if (!el) return 'N/A'; try { return window.getComputedStyle(el).touchAction; }  catch (_) { return 'ERR'; } }
+    function getPE(el)  { if (!el) return 'N/A'; try { return window.getComputedStyle(el).pointerEvents; } catch (_) { return 'ERR'; } }
+
+    var testCanvas   = document.getElementById('test-canvas');
+    var artboard     = document.getElementById('canvas-artboard');
+    var canvasItems  = document.querySelectorAll('.canvas-item');
+    var selectedItems = document.querySelectorAll('.canvas-item.is-selected');
+    var draggingItems = document.querySelectorAll('.canvas-item.is-dragging');
+    var ceItems       = document.querySelectorAll('.canvas-item[contenteditable="true"]');
+
+    var result = {
+      canvasModuleActive:              !!(window.CanvasModule),
+      isMobile:                        CanvasState.isMobile(),
+      mobilePerfDataset:               document.documentElement.dataset.mobilePerf,
+      mode:                            (MI && MI.canvasEdit) ? 'edit' : 'preview',
+
+      /* Profile */
+      activeProfileIdFromAppState:     (function () { try { return window.AppState && window.AppState.getProfile().activeId; } catch (_) { return 'ERR'; } })(),
+      activeProfileIdFromWindow:       (function () { try { return window.activeProfId || null; } catch (_) { return 'ERR'; } })(),
+      activeProfileIdFromLocalStorage: localStorage.getItem('np_active_profile'),
+      activeProfileResolvedName:       prof ? prof.name : null,
+
+      /* Panel */
+      panelExists:                     !!panel,
+      panelVisible:                    panelVisible,
+      panelPointerEvents:              getPE(panel),
+      rootPointerEvents:               getPE(root),
+      delegatedEventsInstalled:        CanvasMobile.isDelegatedInstalled(),
+      lastPanelEvent:                  CanvasMobile.getLastPanelEvent(),
+
+      /* MI canvas disable status */
+      mobileEditToggleExists:          !!document.getElementById('mobile-canvas-edit-toggle'),
+      mobileInteractionCanvasDisabled: !!(MI && MI._canvasDisabledByCanvasModule),
+
+      /* Gestures & locks */
+      canvasLock:                      document.documentElement.dataset.mobileLock || null,
+      gesture:                         document.documentElement.dataset.gesture || null,
+
+      /* Touch action */
+      testCanvasTouchAction:           getTA(testCanvas),
+      artboardTouchAction:             getTA(artboard),
+
+      /* Item counts */
+      selectedCount:                   selectedItems.length,
+      draggingCount:                   draggingItems.length,
+      contentEditableCount:            ceItems.length,
+      canvasItemsPointerEvents:        canvasItems.length ? getPE(canvasItems[0]) : 'N/A'
+    };
+
+    console.table(result);
+    return result;
+  };
+
+  /* ─────────────────────────────────────────────
+     PUBLISH & BOOT
+  ───────────────────────────────────────────── */
+  window.CanvasModule = CanvasModule;
+  CanvasModule.init();
+
+  console.info('[CanvasModule] v10.1.1 canvas-index.js loaded');
 
 })();
 
@@ -8870,6 +9453,426 @@ if ('serviceWorker' in navigator) {
 })();
 
 
+</script>
+
+
+
+<!-- v10.1.2 Emergency Mobile Canvas UX Patch — applied by ChatGPT -->
+<style id="v1012-emergency-css">
+/* Hard kill the returning technical subtitle, regardless of language/cache/legacy mutation. */
+.subtitle,
+header .subtitle,
+body .subtitle{
+  display:none!important;
+  visibility:hidden!important;
+  opacity:0!important;
+  height:0!important;
+  max-height:0!important;
+  margin:0!important;
+  padding:0!important;
+  overflow:hidden!important;
+  pointer-events:none!important;
+}
+
+/* Mobile canvas: controls first, preview second. */
+@media(max-width:760px){
+  #view-canvas{
+    padding-bottom:calc(150px + env(safe-area-inset-bottom,0px))!important;
+    overflow:visible!important;
+    touch-action:pan-y!important;
+  }
+  #view-canvas .canvas-layout{
+    display:flex!important;
+    flex-direction:column!important;
+    gap:14px!important;
+    width:calc(100vw - 22px)!important;
+    max-width:520px!important;
+    margin:0 auto!important;
+    overflow:visible!important;
+    touch-action:pan-y!important;
+  }
+  #view-canvas .canvas-panel{
+    order:1!important;
+    overflow:visible!important;
+    padding:14px!important;
+    border-radius:22px!important;
+    position:relative!important;
+    z-index:8!important;
+  }
+  #view-canvas .canvas-stage{
+    order:2!important;
+    overflow:visible!important;
+    padding:12px!important;
+    border-radius:22px!important;
+    position:relative!important;
+    z-index:2!important;
+  }
+  #view-canvas .canvas-panel h2{
+    margin-bottom:4px!important;
+    font-size:24px!important;
+  }
+  #view-canvas .canvas-panel .sub{
+    display:none!important;
+  }
+  #canvas-control-content{
+    margin-top:8px!important;
+  }
+  #canvas-mobile-controls-root{
+    display:block!important;
+    pointer-events:auto!important;
+    position:relative!important;
+    z-index:30!important;
+    margin-top:10px!important;
+    touch-action:auto!important;
+  }
+  #canvas-mobile-controls-root,
+  #canvas-mobile-controls-root *{
+    pointer-events:auto!important;
+  }
+  #canvas-mobile-controls-root input,
+  #canvas-mobile-controls-root textarea,
+  #canvas-mobile-controls-root select,
+  #canvas-mobile-controls-root button{
+    pointer-events:auto!important;
+    touch-action:manipulation!important;
+    -webkit-user-select:auto!important;
+    user-select:auto!important;
+  }
+  #canvas-mobile-panel,
+  .canvas-mobile-panel{
+    display:flex!important;
+    flex-direction:column!important;
+    gap:10px!important;
+    padding:12px!important;
+    border:1px solid var(--line)!important;
+    border-radius:18px!important;
+    background:color-mix(in srgb,var(--bg-card) 88%,transparent)!important;
+    position:relative!important;
+    z-index:31!important;
+  }
+  .cmp-note{
+    display:block!important;
+    padding:10px 11px!important;
+    border:1px solid rgba(212,175,55,.28)!important;
+    border-radius:14px!important;
+    background:rgba(212,175,55,.08)!important;
+    color:var(--ink-dim)!important;
+    font-family:'Fraunces',serif!important;
+    font-size:12.5px!important;
+    line-height:1.35!important;
+    font-style:italic!important;
+  }
+  .cmp-row{
+    display:flex!important;
+    align-items:center!important;
+    gap:8px!important;
+    min-height:42px!important;
+  }
+  .cmp-label{
+    min-width:72px!important;
+    flex-shrink:0!important;
+  }
+  .cmp-select,
+  .cmp-textarea,
+  .cmp-range,
+  .cmp-btn{
+    pointer-events:auto!important;
+    touch-action:manipulation!important;
+  }
+  .cmp-textarea{
+    min-height:68px!important;
+  }
+  #test-canvas.test-canvas,
+  #view-canvas .test-canvas{
+    min-height:auto!important;
+    height:min(78vw,430px)!important;
+    aspect-ratio:4/5!important;
+    touch-action:pan-y!important;
+    overflow:hidden!important;
+  }
+  #canvas-artboard,
+  #view-canvas .canvas-artboard{
+    touch-action:pan-y!important;
+  }
+  #test-canvas .canvas-item,
+  #test-canvas .canvas-item *{
+    pointer-events:none!important;
+    touch-action:pan-y!important;
+    -webkit-user-select:none!important;
+    user-select:none!important;
+  }
+  #mobile-canvas-edit-toggle,
+  .mobile-edit-toggle{
+    display:none!important;
+    visibility:hidden!important;
+    pointer-events:none!important;
+  }
+}
+@media(max-width:390px){
+  #view-canvas .test-canvas{height:min(82vw,390px)!important;}
+}
+</style>
+<script id="v1012-emergency-js">
+(function(){
+  'use strict';
+  var PATCH_VERSION='v10.1.2-emergency';
+
+  function isMobile(){
+    try{return window.matchMedia('(max-width:760px)').matches || document.documentElement.dataset.mobilePerf==='1';}
+    catch(_){return window.innerWidth<=760;}
+  }
+  function lang(){
+    try{return (document.documentElement.dataset.lang||document.documentElement.lang||localStorage.getItem('np_lang')||'es').toLowerCase().indexOf('en')===0?'en':'es';}
+    catch(_){return 'es';}
+  }
+  function t(es,en){return lang()==='en'?en:es;}
+  function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
+  function textToHtml(s){return esc(s).replace(/\n/g,'<br>');}
+
+  function killSubtitle(){
+    try{
+      document.querySelectorAll('.subtitle').forEach(function(el){
+        el.textContent='';
+        el.innerHTML='';
+        el.setAttribute('aria-hidden','true');
+        el.style.cssText += ';display:none!important;visibility:hidden!important;height:0!important;max-height:0!important;margin:0!important;padding:0!important;overflow:hidden!important;';
+      });
+      // Remove any legacy technical subtitle that was injected as a loose node/element near header.
+      var needles=['20 hues','8 lightness','160 swatches','profiles · comparison','perfiles · comparador'];
+      var header=document.querySelector('header');
+      if(header){
+        Array.from(header.childNodes).forEach(function(n){
+          var txt=(n.textContent||'').trim();
+          if(!txt) return;
+          if(needles.some(function(x){return txt.toLowerCase().indexOf(x.toLowerCase())>-1;})){
+            if(n.nodeType===3) n.textContent='';
+            else if(n.className!=='eyebrow' && n.tagName!=='H1') n.parentNode && n.parentNode.removeChild(n);
+          }
+        });
+      }
+    }catch(_){ }
+  }
+
+  function readUnified(){
+    try{return JSON.parse(localStorage.getItem('colorWheelApp_v1')||'{}');}catch(_){return {};}
+  }
+  function getProfiles(){
+    try{var p=window.AppState&&AppState.getProfile&&AppState.getProfile().profiles;if(p&&p.length)return p;}catch(_){ }
+    try{if(typeof window.getProfs==='function'){var gp=window.getProfs();if(gp&&gp.length)return gp;}}catch(_){ }
+    try{var u=readUnified();if(u.profile&&u.profile.profiles&&u.profile.profiles.length)return u.profile.profiles;}catch(_){ }
+    try{var raw=JSON.parse(localStorage.getItem('np_profs')||'[]');if(raw&&raw.length)return raw;}catch(_){ }
+    return [];
+  }
+  function getActiveProfile(){
+    var id=null;
+    try{var p=window.AppState&&AppState.getProfile&&AppState.getProfile(); if(p&&p.activeId) id=p.activeId;}catch(_){ }
+    try{if(!id && window.activeProfId) id=window.activeProfId;}catch(_){ }
+    try{if(!id) id=localStorage.getItem('np_active_profile')||null;}catch(_){ }
+    try{if(!id){var u=readUnified();id=u&&u.profile&&u.profile.activeId;}}catch(_){ }
+    if(!id) return null;
+    var profs=getProfiles();
+    var prof=profs.find(function(p){return String(p.id)===String(id);})||null;
+    if(prof){try{window.activeProfId=prof.id;}catch(_){ }}
+    return prof;
+  }
+  function updateProfileChip(){
+    try{
+      var chip=document.getElementById('canvas-prof-chip');
+      if(!chip) return;
+      var prof=getActiveProfile();
+      chip.textContent=prof ? (lang()==='en'?'Profile: ':'Perfil: ')+prof.name : t('Sin perfil activo','No active profile');
+    }catch(_){ }
+  }
+
+  var itemIds=['canvas-title','canvas-kicker','canvas-copy','canvas-cta','canvas-star-left','canvas-star-right','canvas-line-left','canvas-line-right'];
+  var labelMap={
+    'canvas-title': ['Título','Title'],
+    'canvas-kicker':['Kicker','Kicker'],
+    'canvas-copy':['Copy','Copy'],
+    'canvas-cta':['CTA','CTA'],
+    'canvas-star-left':['Estrella izq.','Left star'],
+    'canvas-star-right':['Estrella der.','Right star'],
+    'canvas-line-left':['Línea izq.','Left line'],
+    'canvas-line-right':['Línea der.','Right line']
+  };
+  function labelFor(id){var m=labelMap[id]||[id,id];return lang()==='en'?m[1]:m[0];}
+  function isText(id){return ['canvas-title','canvas-kicker','canvas-copy','canvas-cta'].indexOf(id)>-1;}
+  function getSelected(){
+    var sel=document.querySelector('#test-canvas .canvas-item.is-selected');
+    if(sel&&itemIds.indexOf(sel.id)>-1)return sel.id;
+    return 'canvas-title';
+  }
+  function applyTransform(el){
+    if(!el)return;
+    var x=parseFloat(el.dataset.x||'50');
+    var y=parseFloat(el.dataset.y||'50');
+    var sc=parseFloat(el.dataset.scale||'1');
+    el.style.left=x+'%';
+    el.style.top=y+'%';
+    el.style.transform=(el.dataset.center==='true'?'translateX(-50%) ':'')+'scale('+sc+')';
+  }
+  function selectItem(id){
+    if(!id || itemIds.indexOf(id)<0) id='canvas-title';
+    document.querySelectorAll('#test-canvas .canvas-item').forEach(function(el){el.classList.toggle('is-selected',el.id===id);});
+    syncPanel(id);
+  }
+  function updateText(id,value){
+    var el=document.getElementById(id); if(!el)return;
+    el.dataset.userEdited='1';
+    if(id==='canvas-title') el.innerHTML=textToHtml(value);
+    else el.textContent=value;
+  }
+  function updatePosition(id,x,y,center){
+    var el=document.getElementById(id); if(!el)return;
+    if(x!==undefined && x!==null && !isNaN(x)) el.dataset.x=String(x);
+    if(y!==undefined && y!==null && !isNaN(y)) el.dataset.y=String(y);
+    if(center!==undefined) el.dataset.center=center?'true':'false';
+    applyTransform(el);
+  }
+  function updateScale(id,percent){
+    var el=document.getElementById(id); if(!el)return;
+    var p=Math.max(35,Math.min(260,parseFloat(percent)||100));
+    el.dataset.scale=String(p/100);
+    applyTransform(el);
+  }
+  function panelHtml(){
+    var opts=itemIds.map(function(id){return '<option value="'+id+'">'+esc(labelFor(id))+'</option>';}).join('');
+    return ''+
+    '<div class="canvas-mobile-panel" id="canvas-mobile-panel" data-emergency="1">'+
+      '<div class="cmp-note">'+esc(t('Edita desde los controles. La vista previa no se edita directamente en móvil.','Edit from the controls below. The preview is not directly editable on mobile.'))+'</div>'+
+      '<div class="cmp-row"><span class="cmp-label">'+esc(t('Elemento','Element'))+'</span><select class="cmp-select" id="cmp-el-sel">'+opts+'</select></div>'+
+      '<div class="cmp-divider"></div>'+
+      '<div class="cmp-row" id="cmp-text-row" style="align-items:flex-start;"><span class="cmp-label" style="padding-top:6px;">'+esc(t('Texto','Text'))+'</span><textarea class="cmp-textarea" id="cmp-text-inp" rows="3"></textarea></div>'+
+      '<div class="cmp-row"><span class="cmp-label">'+esc(t('Pos. X','X pos'))+'</span><input class="cmp-range" id="cmp-x" type="range" min="0" max="100" step="1"><span class="cmp-val" id="cmp-xv">50</span></div>'+
+      '<div class="cmp-row"><span class="cmp-label">'+esc(t('Pos. Y','Y pos'))+'</span><input class="cmp-range" id="cmp-y" type="range" min="0" max="100" step="1"><span class="cmp-val" id="cmp-yv">50</span></div>'+
+      '<div class="cmp-row"><span class="cmp-label">'+esc(t('Tamaño','Size'))+'</span><input class="cmp-range" id="cmp-sc" type="range" min="35" max="260" step="1"><span class="cmp-val" id="cmp-scv">100</span></div>'+
+      '<div class="cmp-row"><button class="cmp-btn" id="cmp-ctr">'+esc(t('Centrar','Center'))+'</button></div>'+ 
+    '</div>';
+  }
+  function ensureRoot(){
+    var root=document.getElementById('canvas-mobile-controls-root');
+    if(!root){
+      var panel=document.querySelector('#view-canvas .canvas-panel')||document.querySelector('.canvas-panel');
+      if(!panel)return null;
+      root=document.createElement('div');root.id='canvas-mobile-controls-root';panel.appendChild(root);
+    }
+    return root;
+  }
+  function ensurePanel(){
+    var root=ensureRoot(); if(!root)return;
+    var panel=document.getElementById('canvas-mobile-panel');
+    if(!panel || !root.contains(panel) || !document.getElementById('cmp-el-sel')){
+      root.innerHTML=panelHtml();
+    }else if(!panel.querySelector('.cmp-note')){
+      panel.insertAdjacentHTML('afterbegin','<div class="cmp-note">'+esc(t('Edita desde los controles. La vista previa no se edita directamente en móvil.','Edit from the controls below. The preview is not directly editable on mobile.'))+'</div>');
+    }
+    root.dataset.emergencyDelegated='1';
+    var sel=getSelected();
+    selectItem(sel||'canvas-title');
+  }
+  function syncPanel(id){
+    id=id||getSelected()||'canvas-title';
+    var el=document.getElementById(id); if(!el)return;
+    var sel=document.getElementById('cmp-el-sel'); if(sel)sel.value=id;
+    var row=document.getElementById('cmp-text-row'); if(row)row.style.display=isText(id)?'flex':'none';
+    var txt=document.getElementById('cmp-text-inp'); if(txt && isText(id)) txt.value=(id==='canvas-title'?el.innerText:el.textContent)||'';
+    var x=parseFloat(el.dataset.x||'50'), y=parseFloat(el.dataset.y||'50'), sc=Math.round(parseFloat(el.dataset.scale||'1')*100);
+    [['cmp-x',x],['cmp-y',y],['cmp-sc',sc]].forEach(function(pair){var input=document.getElementById(pair[0]);if(input)input.value=Math.round(pair[1]);});
+    [['cmp-xv',x],['cmp-yv',y],['cmp-scv',sc]].forEach(function(pair){var v=document.getElementById(pair[0]);if(v)v.textContent=String(Math.round(pair[1]));});
+  }
+  var lastPanelEvent=null;
+  function installDelegation(){
+    var root=ensureRoot(); if(!root || root.dataset.emergencyEvents==='1')return;
+    root.dataset.emergencyEvents='1';
+    root.addEventListener('change',function(e){
+      if(e.target&&e.target.id==='cmp-el-sel'){
+        lastPanelEvent='change:cmp-el-sel@'+Date.now();
+        selectItem(e.target.value||'canvas-title');
+      }
+    },true);
+    root.addEventListener('input',function(e){
+      var id=e.target&&e.target.id;if(!id)return;
+      var sel=getSelected();
+      lastPanelEvent='input:'+id+'@'+Date.now();
+      if(id==='cmp-text-inp') updateText(sel,e.target.value);
+      if(id==='cmp-x'){var x=parseFloat(e.target.value);updatePosition(sel,x,undefined);var xv=document.getElementById('cmp-xv');if(xv)xv.textContent=String(Math.round(x));}
+      if(id==='cmp-y'){var y=parseFloat(e.target.value);updatePosition(sel,undefined,y);var yv=document.getElementById('cmp-yv');if(yv)yv.textContent=String(Math.round(y));}
+      if(id==='cmp-sc'){var sc=parseFloat(e.target.value);updateScale(sel,sc);var sv=document.getElementById('cmp-scv');if(sv)sv.textContent=String(Math.round(sc));}
+    },true);
+    root.addEventListener('click',function(e){
+      if(e.target&&e.target.id==='cmp-ctr'){
+        lastPanelEvent='click:cmp-ctr@'+Date.now();
+        var sel=getSelected();updatePosition(sel,50,undefined,true);syncPanel(sel);
+      }
+    },true);
+  }
+  function enforceMobileUX(){
+    killSubtitle();
+    updateProfileChip();
+    if(!isMobile())return;
+    try{document.getElementById('mobile-canvas-edit-toggle')?.remove();}catch(_){ }
+    document.documentElement.removeAttribute('data-gesture');
+    if(document.documentElement.dataset.mobileLock==='canvas') delete document.documentElement.dataset.mobileLock;
+    itemIds.forEach(function(id){applyTransform(document.getElementById(id));});
+    ensurePanel();
+    installDelegation();
+  }
+
+  // Patch CanvasModule / old debug without trusting it.
+  function installPublicDebug(){
+    var old=window.__canvasMobileDebug;
+    window.__canvasMobileDebug=function(){
+      var root=document.getElementById('canvas-mobile-controls-root');
+      var panel=document.getElementById('canvas-mobile-panel');
+      var stage=document.querySelector('#view-canvas .canvas-stage');
+      var cpanel=document.querySelector('#view-canvas .canvas-panel');
+      var canvas=document.getElementById('test-canvas');
+      var nav=document.querySelector('.top-nav');
+      var prof=getActiveProfile();
+      var base={};try{base=typeof old==='function'?old():{};}catch(_){base={oldDebugError:true};}
+      return Object.assign(base,{
+        emergencyPatch:PATCH_VERSION,
+        panelExists:!!panel,
+        mobilePanelVisible:!!(panel&&panel.offsetParent!==null),
+        panelPointerEvents:panel?getComputedStyle(panel).pointerEvents:null,
+        rootPointerEvents:root?getComputedStyle(root).pointerEvents:null,
+        delegatedEventsInstalled:!!(root&&root.dataset.emergencyEvents==='1'),
+        lastPanelEvent:lastPanelEvent || base.lastPanelEvent || null,
+        selectedElementId:getSelected(),
+        activeProfileResolvedName:prof?prof.name:null,
+        canvasStageOrder:stage?getComputedStyle(stage).order:null,
+        canvasPanelOrder:cpanel?getComputedStyle(cpanel).order:null,
+        panelTop:cpanel?Math.round(cpanel.getBoundingClientRect().top):null,
+        stageTop:stage?Math.round(stage.getBoundingClientRect().top):null,
+        panelBeforeStage:!!(cpanel&&stage&&cpanel.getBoundingClientRect().top<=stage.getBoundingClientRect().top),
+        previewHeight:canvas?Math.round(canvas.getBoundingClientRect().height):null,
+        viewportHeight:window.innerHeight,
+        bottomNavHeight:nav?Math.round(nav.getBoundingClientRect().height):null,
+        mobileEditToggleExists:!!document.getElementById('mobile-canvas-edit-toggle'),
+        subtitleText:Array.from(document.querySelectorAll('.subtitle')).map(function(el){return el.textContent;}).join(' | ')
+      });
+    };
+  }
+
+  function boot(){
+    installPublicDebug();
+    enforceMobileUX();
+    setTimeout(enforceMobileUX,100);
+    setTimeout(enforceMobileUX,600);
+    setTimeout(enforceMobileUX,1600);
+  }
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true}); else boot();
+  window.addEventListener('load',function(){setTimeout(enforceMobileUX,100);},{once:true});
+  document.addEventListener('click',function(e){
+    if(e.target && (e.target.closest('#btn-canvas')||e.target.closest('[data-view="canvas"]')||e.target.closest('#canvas-mobile-controls-root'))){setTimeout(enforceMobileUX,50);}
+  },true);
+  window.addEventListener('resize',function(){setTimeout(enforceMobileUX,80);},{passive:true});
+  try{
+    new MutationObserver(function(){killSubtitle();}).observe(document.documentElement,{childList:true,subtree:true,characterData:true});
+  }catch(_){ }
+  window.__canvasEmergencyPatch=enforceMobileUX;
+  console.info('[Canvas emergency patch] '+PATCH_VERSION+' loaded');
+})();
 </script>
 
 </body>
