@@ -354,98 +354,9 @@ h1 em{font-weight:800;font-style:normal;color:var(--accent);}
 .h-swatch:hover{transform:translateY(-3px) scale(1.05);box-shadow:0 8px 20px rgba(0,0,0,.5);}
 .h-swatch .hx{font-family:'JetBrains Mono',monospace;font-size:7px;color:rgba(255,255,255,.95);background:rgba(0,0,0,.55);padding:2px 3px;border-radius:1px;}
 
-/* LIENZO — practical contrast test */
-.canvas-layout{display:grid;grid-template-columns:1.05fr .95fr;gap:28px;align-items:start;max-width:1180px;margin:0 auto;}
-@media(max-width:900px){.canvas-layout{grid-template-columns:1fr;}}
-/* v10.1.2: mobile — controls first, preview second; compact preview */
-@media(max-width:760px){.canvas-layout{display:flex!important;flex-direction:column;}.canvas-stage{order:2;}.canvas-panel{order:1;}.test-canvas{min-height:auto!important;height:min(78vw,430px)!important;}}
-html[data-mobile-perf="1"] .canvas-layout{display:flex!important;flex-direction:column;}
-html[data-mobile-perf="1"] .canvas-stage{order:2;}
-html[data-mobile-perf="1"] .canvas-panel{order:1;}
-html[data-mobile-perf="1"] .test-canvas{min-height:auto!important;height:min(78vw,430px)!important;}
-.canvas-stage{background:var(--panel-glass);border:1px solid var(--line);border-radius:26px;padding:22px;box-shadow:0 20px 60px rgba(0,0,0,.24),inset 0 1px 0 rgba(255,255,255,.05);}
-.canvas-meta{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px;font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:.16em;text-transform:uppercase;color:var(--ink-dim);}
-.canvas-chip{border:1px solid var(--line);border-radius:999px;padding:6px 10px;background:var(--code-bg);}
-.test-canvas{min-height:430px;border-radius:22px;border:1px solid rgba(255,255,255,.12);padding:44px;display:flex;flex-direction:column;justify-content:space-between;box-shadow:inset 0 1px 0 rgba(255,255,255,.12),0 16px 50px rgba(0,0,0,.26);transition:background .45s var(--ease-yin),color .45s var(--ease-yin);overflow:hidden;position:relative;}
-.test-canvas::before{content:'';position:absolute;inset:0;background:radial-gradient(circle at 20% 15%,rgba(255,255,255,.14),transparent 32%),radial-gradient(circle at 80% 90%,rgba(0,0,0,.12),transparent 36%);pointer-events:none;}
-.test-canvas>*{position:relative;z-index:1;}
-.canvas-kicker{font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.22em;text-transform:uppercase;opacity:.78;margin-bottom:12px;}
-.canvas-title{font-family:'Fraunces',serif;font-size:clamp(2.1rem,5vw,4.7rem);line-height:.92;font-style:italic;font-weight:300;letter-spacing:-.045em;max-width:760px;}
-.canvas-title strong{font-weight:800;font-style:normal;}
-.canvas-copy{font-family:'Fraunces',serif;font-size:18px;line-height:1.5;max-width:520px;opacity:.86;margin-top:24px;}
-.canvas-cta{display:inline-flex;align-items:center;justify-content:center;width:fit-content;margin-top:26px;border:1px solid currentColor;border-radius:999px;padding:10px 18px;font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.18em;text-transform:uppercase;}
-
-.canvas-editable{outline:none;border-radius:12px;transition:box-shadow .2s var(--ease-yin),background .2s var(--ease-yin);}
-.canvas-editable:focus{box-shadow:0 0 0 1px currentColor;background:rgba(255,255,255,.08);}
-.canvas-title{font-size:var(--canvas-title-size,clamp(2.1rem,5vw,4.7rem));font-family:var(--canvas-font,'Fraunces',serif);}
-.canvas-copy{font-size:var(--canvas-copy-size,18px);font-family:var(--canvas-font,'Fraunces',serif);}
-.canvas-font-controls{border:1px solid var(--line);border-radius:18px;padding:14px;background:var(--code-bg);margin-top:12px;display:grid;gap:10px;}
-.canvas-control-label{font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:.16em;text-transform:uppercase;color:var(--ink-dim);}
-.canvas-select,.canvas-input{width:100%;border:1px solid var(--line);border-radius:12px;background:var(--bg-soft);color:var(--ink);padding:9px 10px;font-family:'JetBrains Mono',monospace;font-size:11px;outline:none;}
-.canvas-range{width:100%;accent-color:var(--accent);}
-.canvas-mini-note{font-size:12px;line-height:1.45;color:var(--ink-dim);font-style:italic;}
-.canvas-panel{background:var(--panel-glass);border:1px solid var(--line);border-radius:26px;padding:22px;box-shadow:0 12px 40px rgba(0,0,0,.2),inset 0 1px 0 rgba(255,255,255,.05);}
-.canvas-panel h2{font-size:26px;font-weight:300;font-style:italic;margin-bottom:6px;}
-.canvas-panel .sub{font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-dim);line-height:1.5;margin-bottom:16px;}
-.canvas-color-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;}
-.canvas-color-card{border:1px solid var(--line);border-radius:16px;padding:12px;background:var(--code-bg);}
-.canvas-swatch{height:54px;border-radius:12px;border:1px solid rgba(255,255,255,.12);margin-bottom:9px;}
-.canvas-label{font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:.18em;text-transform:uppercase;color:var(--ink-dim);margin-bottom:4px;}
-.canvas-hex{font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--ink);font-weight:600;}
-.canvas-name{font-size:13px;font-style:italic;color:var(--ink-dim);margin-top:3px;line-height:1.25;}
-.canvas-score{border:1px solid var(--line);border-radius:18px;padding:15px;background:var(--code-bg);margin-top:12px;}
-.canvas-score-top{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin-bottom:10px;}
-.canvas-score-title{font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.17em;text-transform:uppercase;color:var(--ink-dim);}
-.canvas-score-num{font-family:'JetBrains Mono',monospace;font-size:22px;color:var(--accent);font-weight:600;}
-.canvas-meter{height:8px;border-radius:99px;background:var(--line);overflow:hidden;margin-bottom:10px;}
-.canvas-meter-fill{height:100%;border-radius:99px;background:var(--accent);transition:width .5s var(--ease-yin);}
-.canvas-note{font-size:13px;line-height:1.45;color:var(--ink-dim);}
-.canvas-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px;}
-.canvas-btn{border:1px solid var(--line);background:transparent;color:var(--ink-dim);border-radius:999px;padding:8px 12px;font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:.14em;text-transform:uppercase;cursor:pointer;transition:all .25s var(--ease-yin);}
-.canvas-btn:hover{border-color:var(--accent);color:var(--accent);transform:translateY(-1px);}
-.canvas-empty{border:1px dashed var(--line);border-radius:18px;padding:18px;text-align:center;color:var(--ink-dim);font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.12em;text-transform:uppercase;line-height:1.6;}
-.canvas-selected-row{display:flex;align-items:center;gap:8px;margin-bottom:8px;}
-.canvas-selected-row .canvas-control-label{flex-shrink:0;margin-bottom:0;font-size:10px;}
-.canvas-select-compact{flex:1;padding:6px 8px;font-size:10px;}
-/* Lienzo flyer editable v1.4 */
-.test-canvas{min-height:560px;aspect-ratio:4/5;padding:0;display:block;user-select:none;touch-action:none;}
-.test-canvas::before{background:radial-gradient(circle at 18% 12%,rgba(255,255,255,.16),transparent 30%),radial-gradient(circle at 80% 88%,rgba(0,0,0,.10),transparent 40%);}
-.canvas-artboard{position:absolute;inset:0;z-index:1;overflow:hidden;border-radius:22px;}
-.canvas-item{position:absolute;z-index:2;min-width:42px;min-height:24px;outline:none;border-radius:12px;padding:4px 8px;cursor:grab;touch-action:none;transition:box-shadow .18s var(--ease-yin),background .18s var(--ease-yin),transform .18s var(--ease-yin);}
-.canvas-item:active{cursor:grabbing;}
-.canvas-item:hover{box-shadow:0 0 0 1px currentColor,0 10px 28px rgba(0,0,0,.18);background:rgba(255,255,255,.08);}
-.canvas-item.is-selected{box-shadow:0 0 0 2px currentColor,0 12px 32px rgba(0,0,0,.22);background:rgba(255,255,255,.10);}
-body.light .canvas-item:hover,body.light .canvas-item.is-selected{background:rgba(255,255,255,.28);}
-.canvas-item[contenteditable="true"]{-webkit-user-select:text;user-select:text;}
-.canvas-item .drag-hint{display:none;}
-.canvas-kicker{font-family:'JetBrains Mono',monospace;font-size:14px;letter-spacing:.26em;text-transform:uppercase;opacity:.82;white-space:nowrap;}
-.canvas-title{font-family:var(--canvas-font,'Fraunces',serif);font-size:var(--canvas-title-size,92px);line-height:.82;font-style:normal;font-weight:850;letter-spacing:-.055em;max-width:92%;text-align:center;text-transform:uppercase;}
-.canvas-title strong{font-weight:850;font-style:normal;}
-.canvas-copy{font-family:var(--canvas-copy-font,'JetBrains Mono',monospace);font-size:var(--canvas-copy-size,22px);line-height:1.2;letter-spacing:.22em;text-transform:uppercase;text-align:center;max-width:88%;opacity:.92;}
-.canvas-cta{font-family:'JetBrains Mono',monospace;font-size:15px;letter-spacing:.2em;text-transform:uppercase;border:1px solid currentColor;border-radius:999px;padding:10px 22px;white-space:nowrap;}
-.canvas-star{font-size:54px;line-height:1;opacity:.9;padding:0 6px;}
-.canvas-line{height:2px;width:120px;min-height:2px;border-radius:999px;background:currentColor;opacity:.72;padding:0;}
-.canvas-item[data-x="50"]{transform:translateX(-50%);}
-.canvas-item[data-center="true"]{transform:translateX(-50%);}
-.canvas-size-row{display:grid;grid-template-columns:1fr 72px;gap:8px;align-items:center;}
-.canvas-input-mini{border:1px solid var(--line);border-radius:10px;background:var(--bg-soft);color:var(--ink);padding:8px 7px;font-family:'JetBrains Mono',monospace;font-size:10px;outline:none;text-align:center;}
-.canvas-tool-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px;}
-.canvas-btn.primary{border-color:var(--ok-line);background:var(--ok-soft);color:var(--ok-ink);}
-.canvas-help{border:1px dashed var(--line);border-radius:14px;padding:10px;margin-top:10px;color:var(--ink-dim);font-size:12px;line-height:1.45;}
-.canvas-elements-panel{border:1px solid var(--line);border-radius:18px;padding:14px;background:var(--code-bg);margin-top:12px;display:grid;gap:10px;}
-.canvas-element-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
-.canvas-extra{font-family:var(--canvas-font,'Fraunces',serif);font-size:28px;text-align:center;}
-.canvas-extra[data-shape="circle"]{width:76px;height:76px;border:2px solid currentColor;border-radius:50%;padding:0;background:transparent;}
-.canvas-extra[data-shape="frame"]{width:180px;height:110px;border:2px solid currentColor;border-radius:18px;padding:0;background:transparent;}
-.canvas-extra[data-shape="line"]{width:130px;height:2px;min-height:2px;border-radius:999px;background:currentColor;padding:0;}
-.canvas-extra[data-shape="star"]{font-size:46px;line-height:1;padding:0 6px;}
-.canvas-extra[data-shape="text"]{font-size:32px;letter-spacing:.08em;text-transform:uppercase;min-width:120px;}
+/* Legacy canvas CSS removed in v11.1.5 */
 .profile-ai-desc{margin:10px 0 2px;padding:10px 12px;border:1px solid var(--line);border-radius:14px;background:var(--code-bg);font-family:'Fraunces',serif;font-size:13px;line-height:1.35;color:var(--ink-dim);font-style:italic;}
 .profile-ai-desc strong{color:var(--ink);font-weight:600;font-style:normal;}
-.canvas-item-toolbar{position:absolute;right:-10px;top:-12px;display:flex;gap:5px;z-index:12;pointer-events:auto;}
-.canvas-mini-action{width:22px;height:22px;border-radius:50%;border:1px solid currentColor;background:var(--bg-card);color:currentColor;display:flex;align-items:center;justify-content:center;font-family:'JetBrains Mono',monospace;font-size:12px;line-height:1;cursor:pointer;box-shadow:0 7px 18px rgba(0,0,0,.22);}
-.canvas-resize-handle{position:absolute;right:-8px;bottom:-8px;width:18px;height:18px;border-radius:6px;border:1px solid currentColor;background:var(--bg-card);cursor:nwse-resize;z-index:12;box-shadow:0 7px 18px rgba(0,0,0,.22);}
-.canvas-resize-handle::before{content:'';position:absolute;right:4px;bottom:4px;width:7px;height:7px;border-right:2px solid currentColor;border-bottom:2px solid currentColor;opacity:.8;}
 
 
 
@@ -837,8 +748,7 @@ footer .dot{color:var(--accent);margin:0 8px;}
 .btn-pa,.btn-new-prof{border-radius:999px!important;font-family:-apple-system,BlinkMacSystemFont,'Inter',sans-serif!important;letter-spacing:.02em!important;text-transform:none!important;font-weight:650!important;padding:9px 12px!important;}
 .btn-pa.primary{background:color-mix(in srgb,var(--accent) 88%,white 12%)!important;color:#17120a!important;}.btn-pa[data-act],.btn-pa.primary{box-shadow:inset 0 1px 0 rgba(255,255,255,.24),0 10px 22px rgba(0,0,0,.12)!important;}
 .cslot{border-radius:22px!important;}.cslot .sprev{border-radius:14px!important;}
-.canvas-font-controls{border-radius:24px!important;padding:14px!important;background:color-mix(in srgb,var(--bg-soft) 90%,transparent)!important;}.canvas-select{appearance:none;-webkit-appearance:none;border-radius:16px!important;padding:13px 40px 13px 14px!important;font-family:var(--select-font, 'Fraunces', serif)!important;font-size:15px!important;letter-spacing:0!important;background:linear-gradient(180deg,color-mix(in srgb,var(--bg-card) 88%,white 4%),color-mix(in srgb,var(--bg-card) 92%,black 2%))!important;box-shadow:inset 0 1px 0 rgba(255,255,255,.10),0 8px 20px rgba(0,0,0,.10)!important;}.canvas-font-select-wrap{position:relative;}.canvas-font-select-wrap::after{content:'⌄';position:absolute;right:14px;top:50%;transform:translateY(-50%);color:var(--ink-dim);pointer-events:none;font-size:16px;}
-#canvas-title-size,#canvas-title-num,#canvas-copy-size,#canvas-copy-num{display:none!important;}.canvas-help{display:none!important;}
+/* v11.1.5: legacy canvas font-controls / title-size CSS removed */
 html[data-lang="en"] [data-view="wheel"], html[data-lang="en"] #btn-wheel{font-size:0!important;}html[data-lang="en"] [data-view="wheel"]::after, html[data-lang="en"] #btn-wheel::after{content:'Inspo Wheel';font-size:10px;}
 
 /* v6.5 persistence + smart matching */
@@ -858,19 +768,7 @@ html[data-lang="en"] [data-view="wheel"], html[data-lang="en"] #btn-wheel{font-s
 
 /* Extracted from v8.1.1 style tag 2 */
 
-/* v6 modular hardening: safer canvas layout and non-fragile editable artboard */
-.canvas-layout{width:min(1180px,calc(100vw - 48px));max-width:1180px;margin-left:auto!important;margin-right:auto!important;overflow:visible!important;}
-.canvas-stage,.canvas-panel{min-width:0;overflow:hidden;}
-.canvas-meta{display:flex;flex-wrap:wrap;max-width:100%;overflow:hidden;gap:8px;}
-.canvas-meta span:first-child{max-width:70%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-.canvas-meta .canvas-chip{max-width:28%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-.test-canvas{max-width:100%;contain:layout paint;}
-.canvas-artboard{isolation:isolate;}
-.canvas-item{will-change:transform,left,top;}
-.canvas-item.is-dragging{cursor:grabbing!important;user-select:none!important;-webkit-user-select:none!important;}
-.canvas-item[contenteditable="true"]{cursor:text;}
-.canvas-item[contenteditable="true"].is-dragging{cursor:grabbing!important;}
-@media(max-width:900px){.canvas-layout{width:calc(100vw - 28px);} .canvas-meta span:first-child,.canvas-meta .canvas-chip{max-width:100%;}}
+/* v6 modular hardening: legacy canvas CSS removed in v11.1.5 */
 
 /* v6.5 persistence + smart matching */
 .smart-match-panel{border:1px solid var(--line);background:linear-gradient(180deg,var(--bg-card),rgba(255,255,255,.018));border-radius:22px;padding:15px;margin:12px 0 14px;box-shadow:0 14px 38px rgba(0,0,0,.16),inset 0 1px 0 rgba(255,255,255,.06)}
@@ -913,9 +811,7 @@ html[data-lang="en"] [data-view="wheel"], html[data-lang="en"] #btn-wheel{font-s
   .arc-group .arc-path{transition:stroke .16s var(--ease-yin),stroke-width .16s var(--ease-yin),filter .16s ease,opacity .16s var(--ease-yin)!important;}
   .arc-group.is-hovered{transform:scale(1.025)!important;}
   .arc-group.is-hovered .arc-path{filter:brightness(1.06) saturate(1.08) drop-shadow(0 5px 10px rgba(0,0,0,.22))!important;}
-  .canvas-layout{width:calc(100vw - 22px)!important;max-width:520px!important;gap:18px!important;}
-  .canvas-stage,.canvas-panel{padding:16px!important;border-radius:22px!important;}
-  .test-canvas{min-height:min(560px,118vw)!important;contain:layout paint!important;}
+  /* v11.1.5: legacy canvas-layout/stage/panel/test-canvas mobile rules removed */
   .arc-group .arc-path{backface-visibility:hidden;}
   #wheel.is-dragging .arc-group .arc-path{transition:none!important;filter:none!important;}
   #wheel.is-dragging .arc-group.is-hovered{transform:none!important;}
@@ -1000,26 +896,15 @@ html[data-lang="en"] [data-view="wheel"], html[data-lang="en"] #btn-wheel{font-s
   html[data-mobile-perf="1"] #wheel{touch-action:none!important;-webkit-tap-highlight-color:transparent;}
   html[data-mobile-lock="wheel"] #wheel{touch-action:none!important;}
   html[data-mobile-perf="1"] .hex-search,
-  html[data-mobile-perf="1"] .canvas-input,
-  html[data-mobile-perf="1"] .canvas-input-mini,
-  html[data-mobile-perf="1"] .canvas-select,
   html[data-mobile-perf="1"] input,
   html[data-mobile-perf="1"] select{font-size:16px!important;}
   html[data-mobile-perf="1"] .cslot,
   html[data-mobile-perf="1"] .btn-go,
   html[data-mobile-perf="1"] .btn-save,
-  html[data-mobile-perf="1"] .canvas-btn,
   html[data-mobile-perf="1"] .nav-btn{min-height:44px;}
   html[data-mobile-perf="1"] .compare-slots{gap:12px!important;}
   html[data-mobile-perf="1"] .cslot{padding:16px 12px!important;}
-  /* v10.1: canvas always pan-y on mobile. Items pointer-events:none — panel-only editing. */
-  html[data-mobile-perf="1"] .test-canvas{touch-action:pan-y!important;}
-  html[data-mobile-perf="1"] .canvas-artboard{touch-action:pan-y!important;}
-  html[data-mobile-perf="1"] .canvas-item{touch-action:pan-y!important;pointer-events:none!important;}
-  html[data-mobile-perf="1"] .canvas-item *{pointer-events:none!important;}
-  .mobile-edit-toggle{display:none;}
-  html[data-mobile-perf="1"] .mobile-edit-toggle{display:flex;position:sticky;top:8px;z-index:25;margin:0 0 10px auto;width:fit-content;align-items:center;gap:7px;border:1px solid var(--line);border-radius:999px;background:var(--bg-soft);color:var(--ink-dim);padding:9px 12px;font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:.12em;text-transform:uppercase;box-shadow:0 10px 24px rgba(0,0,0,.18);}
-  html[data-mobile-perf="1"] .mobile-edit-toggle.is-on{border-color:var(--accent);background:var(--accent);color:#09090e;font-weight:800;}
+  /* v11.1.5: legacy canvas touch/pointer rules and mobile-edit-toggle removed */
   html[data-mobile-perf="1"] .mobile-interaction-toast{position:fixed;left:50%;bottom:18px;transform:translateX(-50%) translateY(8px);z-index:500;opacity:0;pointer-events:none;border:1px solid var(--line);border-radius:999px;background:var(--bg-soft);color:var(--ink);padding:9px 13px;font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:.08em;text-transform:uppercase;box-shadow:0 16px 35px rgba(0,0,0,.22);transition:opacity .2s var(--ease-yin),transform .2s var(--ease-yin);}
   html[data-mobile-perf="1"] .mobile-interaction-toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
 }
@@ -1145,17 +1030,7 @@ html[data-lang="en"] [data-view="wheel"], html[data-lang="en"] #btn-wheel{font-s
    Canvas passive mode must behave like normal page content on mobile.
    Smear now exposes CSS/JS knobs through AppModules.NavSmearController. */
 @media(max-width:760px){
-  /* v10.1: canvas always scrollable — no mode-gating. Items never interactive on mobile. */
-  html[data-mobile-perf="1"] .test-canvas,
-  html[data-mobile-perf="1"] .test-canvas .canvas-artboard{
-    touch-action:pan-y!important;
-  }
-  html[data-mobile-perf="1"] .test-canvas .canvas-item,
-  html[data-mobile-perf="1"] .test-canvas .canvas-item *{
-    pointer-events:none!important;
-    user-select:none!important;
-    -webkit-user-select:none!important;
-  }
+  /* v11.1.5: legacy canvas scroll guard CSS removed */
   html[data-mobile-perf="1"] .top-nav{
     --smear-blur:3.2px;
     --smear-alpha:1;
@@ -1186,8 +1061,6 @@ html[data-lang="en"] [data-view="wheel"], html[data-lang="en"] #btn-wheel{font-s
 .view.active{visibility:visible;z-index:1;}
 html[data-tab-changing="1"] .view{transition-duration:.36s!important;}
 html[data-tab-changing="1"] .view:not(.active){pointer-events:none!important;}
-html[data-tab-changing="1"] .canvas-stage,
-html[data-tab-changing="1"] .test-canvas,
 html[data-tab-changing="1"] .info-panel{transform:translateZ(0);backface-visibility:hidden;-webkit-backface-visibility:hidden;}
 .top-nav{min-height:44px;transform:translateZ(0);backface-visibility:hidden;-webkit-backface-visibility:hidden;}
 .nav-btn{touch-action:manipulation;-webkit-tap-highlight-color:transparent;}
@@ -1243,14 +1116,10 @@ html.identity-tour-picking .top-nav,html.identity-tour-picking header{opacity:1;
   .identity-tour-kicker{font-size:7.5px;margin-bottom:5px;}
   .identity-tour-purpose{gap:4px}.identity-tour-choice{padding:6px 8px;font-size:7.5px;}
   .identity-tour-btn{padding:7px 8px;font-size:7.5px;}
-  #view-canvas .canvas-layout{overflow:visible!important;touch-action:pan-y!important;overscroll-behavior-y:auto!important;}
-  #view-canvas .canvas-stage,#view-canvas .canvas-panel{overflow:visible!important;}
-  /* v10.1: canvas always scrollable. No lock rules. No mobile contenteditable. */
-  html[data-mobile-perf="1"] #test-canvas{touch-action:pan-y!important;overscroll-behavior-y:auto!important;}
-  /* v10.1.2: safe bottom padding so bottom nav never covers controls */
-  #view-canvas{padding-bottom:calc(140px + env(safe-area-inset-bottom,0px));}
+  /* v11.1.5: legacy canvas-layout/stage/panel and #test-canvas rules removed */
+  /* Canvas V2 injects its own #view-canvas padding-bottom via canvas-v2-ui.js */
 }
-html[data-mobile-perf="1"] #view-canvas{padding-bottom:calc(140px + env(safe-area-inset-bottom,0px));}
+/* v11.1.5: legacy #view-canvas padding-bottom removed — Canvas V2 owns this */
 </style>
 
 </head>
@@ -1471,35 +1340,7 @@ M -50,0 C -50,-28 -28,-50 0,-50 C 14,-50 25,-44 30,-35 C 35,-26 25,-18 15,-18 C 
 </div>
 <!-- VIEW: LIENZO -->
 <div class="view" id="view-canvas">
-<!-- Legacy canvas: hidden by CanvasV2 in v11.0. Kept for reference. -->
-<div class="canvas-layout" id="canvas-legacy-layout" style="display:none">
-<section class="canvas-stage">
-<div class="canvas-meta">
-<span>Test visual · Fondo A / Texto B</span>
-<span class="canvas-chip" id="canvas-prof-chip">Sin perfil activo</span>
-</div>
-<div class="test-canvas" id="test-canvas">
-<div class="canvas-artboard" id="canvas-artboard">
-<div class="canvas-star canvas-item" data-x="14" data-y="24" id="canvas-star-left">✦</div>
-<div class="canvas-star canvas-item" data-x="86" data-y="24" id="canvas-star-right">✦</div>
-<div class="canvas-title canvas-editable canvas-item" contenteditable="true" data-center="true" data-x="50" data-y="22" id="canvas-title" spellcheck="false">NU<br>AMOR</br></div>
-<div class="canvas-copy canvas-editable canvas-item" contenteditable="true" data-center="true" data-x="50" data-y="62" id="canvas-kicker" spellcheck="false">HOUSE &amp; DISCO</div>
-<div class="canvas-line canvas-item" data-x="18" data-y="73" id="canvas-line-left"></div>
-<div class="canvas-copy canvas-editable canvas-item" contenteditable="true" data-center="true" data-x="50" data-y="70" id="canvas-copy" spellcheck="false">BYRON BAY</div>
-<div class="canvas-line canvas-item" data-x="66" data-y="73" id="canvas-line-right"></div>
-<div class="canvas-cta canvas-editable canvas-item" contenteditable="true" data-center="true" data-x="50" data-y="82" id="canvas-cta" spellcheck="false">SAT 24 AUGUST · 23:00</div>
-</div>
-</div>
-</section>
-<aside class="canvas-panel">
-<h2>Lienzo</h2>
-<div class="sub">Usa el perfil cargado y los colores A/B seleccionados en Rueda Inspo.</div>
-<div id="canvas-control-content"></div>
-<!-- v10.0.4a: stable host for mobile panel — survives renderCanvasTest() innerHTML replacements -->
-<div id="canvas-mobile-controls-root"></div>
-</aside>
-</div>
-</div>
+<!-- Legacy canvas DOM removed in v11.1.5 -->
 <!-- MODAL: SAVE PALETTE -->
 <div class="modal-ov" id="modal-pal">
 <div class="modal">
@@ -1526,7 +1367,7 @@ M -50,0 C -50,-28 -28,-50 0,-50 C 14,-50 25,-44 30,-35 C 35,-26 25,-18 15,-18 C 
 
 </div>
 <script>
-/* ── Color Harmony v11.1.4 Canvas Preview Full Visual Layout — generated by build.js — do not edit directly ── */
+/* ── Color Harmony v11.1.5 Legacy Canvas Cleanup — generated by build.js — do not edit directly ── */
 
 /* ── src/core/state.js ── */
 /* ── AppState v10.0 ── single source of truth ── */
@@ -2295,30 +2136,15 @@ window.AppModules.MobileInteraction = window.AppModules.MobileInteraction || (fu
     el.textContent=msg;el.classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>el.classList.remove('show'),1300);
   }
   function setCanvasEdit(on,opts){
-    canvasEdit=!!on;
-    const c=document.getElementById('test-canvas');
-    const b=document.getElementById('mobile-canvas-edit-toggle');
-    if(c)c.classList.toggle('mobile-canvas-edit',canvasEdit);
-    if(b){b.classList.toggle('is-on',canvasEdit);b.textContent=canvasEdit?'Editar lienzo: ON':'Editar lienzo';}
-    document.querySelectorAll('#test-canvas [contenteditable="true"]').forEach(el=>{
-      if(enabled)el.setAttribute('contenteditable',canvasEdit?'true':'false');
-    });
-    if(opts&&opts.toast)toast(canvasEdit?'Modo edición activado':'Lienzo pasivo · scroll normal');
+    /* v11.1.5: Legacy canvas removed — Canvas V2 handles all canvas editing. No-op. */
   }
   function installCanvasToggle(){
-    if(!enabled)return;
-    const panel=document.querySelector('.canvas-panel');
-    const canvas=document.getElementById('test-canvas');
-    if(!panel||!canvas||document.getElementById('mobile-canvas-edit-toggle'))return;
-    const b=document.createElement('button');b.type='button';b.id='mobile-canvas-edit-toggle';b.className='mobile-edit-toggle';b.textContent='Editar lienzo';
-    b.addEventListener('click',()=>setCanvasEdit(!canvasEdit,{toast:true}));
-    panel.insertBefore(b,panel.firstChild);
-    setCanvasEdit(false);
+    /* v11.1.5: Legacy canvas removed — mobile canvas toggle no longer needed. No-op. */
   }
   function install(){
     if(!enabled)return;
     try{document.getElementById('hexin')?.setAttribute('inputmode','text');document.getElementById('hexin')?.setAttribute('autocomplete','off');}catch(_){ }
-    installCanvasToggle();
+    /* v11.1.5: installCanvasToggle() removed — no legacy canvas toggle */
     window.addEventListener('orientationchange',()=>setTimeout(()=>{try{window.AppModules?.Motion?.nav?.scheduleLayoutSync?.();}catch(_){}},250),{passive:true});
   }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',install,{once:true}); else setTimeout(install,0);
@@ -3151,7 +2977,7 @@ btnCanvas.addEventListener('click',()=>{
   beginTabTransition();
   mode='canvas';setNavActive(btnCanvas,true);showView('canvas');
   renderCanvasTest();
-  window.AppModules.MobileInteraction&&window.AppModules.MobileInteraction.installCanvasToggle&&window.AppModules.MobileInteraction.installCanvasToggle();
+  /* v11.1.5: installCanvasToggle removed — Canvas V2 handles mobile canvas */
 });
 
 function highlightSlot(){
@@ -3882,223 +3708,23 @@ const CANVAS_FONTS={
   'JetBrains Mono':'JetBrains Mono — técnico',
   'Trebuchet MS':'Trebuchet MS — limpio'
 };
-const CANVAS_ITEMS=['canvas-title','canvas-kicker','canvas-copy','canvas-cta','canvas-star-left','canvas-star-right','canvas-line-left','canvas-line-right'];
-function applyCanvasDesign(){
-  const canvas=document.getElementById('test-canvas');if(!canvas)return;
-  const family=canvasDesign.font==='Fraunces'?"'Fraunces', serif":canvasDesign.font==='JetBrains Mono'?"'JetBrains Mono', monospace":`'${canvasDesign.font}', sans-serif`;
-  canvas.style.setProperty('--canvas-font',family);
-  canvas.style.setProperty('--canvas-title-size',canvasDesign.titleSize+'px');
-  canvas.style.setProperty('--canvas-copy-size',canvasDesign.copySize+'px');
+/* ── v11.1.5: Legacy canvas implementation removed.
+   Canvas V2 is the only canvas system. Compatibility stubs below delegate to CanvasV2. ── */
+function renderCanvasTest(reason) {
+  /* v11.1.5: delegate to Canvas V2 */
+  return window.CanvasV2 && window.CanvasV2.render(reason || 'legacy-renderCanvasTest');
 }
-function positionCanvasItem(el){
-  if(!el)return;
-  const x=parseFloat(el.dataset.x||50), y=parseFloat(el.dataset.y||50);
-  el.style.left=x+'%'; el.style.top=y+'%';
-  transformCanvasItem(el);
+function selectCanvasItem(id) {
+  /* v11.1.5: delegate to Canvas V2 */
+  return window.CanvasV2 && window.CanvasV2.selectElement && window.CanvasV2.selectElement(id);
 }
-function selectCanvasItem(id){
-  canvasDesign.selected=id||null;
-  document.querySelectorAll('.canvas-item-toolbar,.canvas-resize-handle').forEach(n=>n.remove());
-  CANVAS_ITEMS.forEach(k=>{const el=document.getElementById(k); if(el)el.classList.toggle('is-selected',k===id);});
-  const label=document.getElementById('canvas-selected-label');
-  const names={'canvas-title':'Titular','canvas-kicker':'Subtítulo','canvas-copy':'Texto pequeño','canvas-cta':'Caja / fecha','canvas-star-left':'Estrella izquierda','canvas-star-right':'Estrella derecha','canvas-line-left':'Línea izquierda','canvas-line-right':'Línea derecha'};
-  if(label){
-    const el=id?document.getElementById(id):null;
-    label.textContent=id?(names[id]||(el&&el.dataset.label)||'Elemento'):'Nada seleccionado';
-  }
-  const el=id?document.getElementById(id):null;
-  if(el){
-    const tb=document.createElement('div');tb.className='canvas-item-toolbar';
-    const del=document.createElement('button');del.type='button';del.className='canvas-mini-action';del.textContent='×';del.title='Borrar elemento';
-    del.addEventListener('pointerdown',e=>e.stopPropagation());
-    del.addEventListener('click',e=>{e.preventDefault();e.stopPropagation();deleteCanvasElement(id);});
-    tb.appendChild(del);el.appendChild(tb);
-    const rh=document.createElement('div');rh.className='canvas-resize-handle';rh.title='Agrandar / reducir';
-    rh.addEventListener('pointerdown',ev=>{
-      ev.preventDefault();ev.stopPropagation();
-      const Gestures=window.AppModules&&window.AppModules.Gestures;
-      if(Gestures&&!Gestures.acquire('resize',ev))return;
-      const startX=ev.clientX,startY=ev.clientY,startScale=parseFloat(el.dataset.scale||'1');
-      rh.setPointerCapture(ev.pointerId);
-      const move=e=>{e.preventDefault();const delta=(e.clientX-startX + e.clientY-startY)/220;const sc=Math.max(.35,Math.min(2.6,startScale+delta));el.dataset.scale=sc.toFixed(2);transformCanvasItem(el);const ss=document.getElementById('canvas-selected-scale'),ssn=document.getElementById('canvas-selected-scale-num');if(ss)ss.value=Math.round(sc*100);if(ssn)ssn.value=Math.round(sc*100);};
-      const up=e=>{try{rh.releasePointerCapture(ev.pointerId);}catch(_){} window.AppModules.Gestures&&window.AppModules.Gestures.release('resize'); rh.removeEventListener('pointermove',move);rh.removeEventListener('pointerup',up);rh.removeEventListener('pointercancel',up);};
-      rh.addEventListener('pointermove',move);rh.addEventListener('pointerup',up);rh.addEventListener('pointercancel',up);
-    });
-    el.appendChild(rh);
-  }
+function positionCanvasItem() {
+  /* v11.1.5: delegate to Canvas V2 */
+  return window.CanvasV2 && window.CanvasV2.render('legacy-positionCanvasItem');
 }
-function transformCanvasItem(el){
-  const scale=parseFloat(el.dataset.scale||'1');
-  const center=el.dataset.center==='true'?'translateX(-50%) ':'';
-  el.style.transform=center+'scale('+scale+')';
-  el.style.transformOrigin='center center';
-}
-function bindSingleCanvasItem(id){
-  const board=document.getElementById('canvas-artboard');
-  const el=document.getElementById(id);
-  if(!board||!el||el.dataset.dragReady)return;
-  el.dataset.dragReady='1';
-  positionCanvasItem(el);
-
-  // v6: safer canvas interaction.
-  // A click selects/edits. Drag only starts after a small movement threshold.
-  // This prevents text editing, resize handles and drag from competing for pointer events.
-  el.addEventListener('pointerdown',ev=>{
-    if(ev.target.closest('.canvas-mini-action,.canvas-resize-handle'))return;
-    const MI=window.AppModules&&AppModules.MobileInteraction;
-    if(MI&&MI.enabled&&!MI.canvasEdit){
-      // v8.7: canvas is passive on mobile unless edit mode is explicit.
-      return;
-    }
-    const Gestures=window.AppModules&&window.AppModules.Gestures;
-    const editableClick=el.isContentEditable&&ev.target===el;
-    if(!editableClick&&Gestures&&!Gestures.acquire('canvas',ev))return;
-    selectCanvasItem(id);
-    const startX=ev.clientX,startY=ev.clientY;
-    const rect=board.getBoundingClientRect();
-    const er=el.getBoundingClientRect();
-    const offX=startX-er.left, offY=startY-er.top;
-    let dragging=false;
-    let captured=false;
-    const threshold=6;
-
-    const move=e=>{
-      const dx=e.clientX-startX,dy=e.clientY-startY;
-      if(!dragging){
-        if(Math.hypot(dx,dy)<threshold)return;
-        const Gestures=window.AppModules&&window.AppModules.Gestures;
-        if(Gestures&&!Gestures.is('canvas',ev)&&!Gestures.acquire('canvas',ev))return;
-        dragging=true;
-        el.classList.add('is-dragging');
-        window.AppModules.Haptics&&window.AppModules.Haptics.tap();
-        if(el.isContentEditable)el.setAttribute('data-editing-before-drag','1');
-        try{el.setPointerCapture(ev.pointerId);captured=true;}catch(_){}
-        // v10.0.2: acquire gesture ownership so MI knows canvas is active
-        const MI_drag=window.AppModules&&window.AppModules.MobileInteraction;
-        if(MI_drag&&MI_drag.enabled)MI_drag.lock('canvas');
-      }
-      e.preventDefault();
-      let x=((e.clientX-rect.left-offX+(el.dataset.center==='true'?er.width/2:0))/rect.width)*100;
-      let y=((e.clientY-rect.top-offY)/rect.height)*100;
-      x=Math.max(0,Math.min(100,x)); y=Math.max(0,Math.min(100,y));
-      el.dataset.x=x.toFixed(1); el.dataset.y=y.toFixed(1); positionCanvasItem(el);
-    };
-    const up=e=>{
-      if(captured){try{el.releasePointerCapture(ev.pointerId);}catch(_){}}
-      el.classList.remove('is-dragging');
-      el.removeEventListener('pointermove',move); el.removeEventListener('pointerup',up); el.removeEventListener('pointercancel',up);
-      const Gestures=window.AppModules&&window.AppModules.Gestures;
-      if(Gestures&&Gestures.is('canvas',e))Gestures.release('canvas');
-      // v10.0.2: always release canvas gesture lock on pointer end
-      const MI_up=window.AppModules&&window.AppModules.MobileInteraction;
-      if(MI_up&&MI_up.enabled&&MI_up.isLocked('canvas'))MI_up.unlock('canvas');
-      if(!dragging && el.isContentEditable){
-        // Preserve normal text editing on click/tap.
-        try{el.focus({preventScroll:true});}catch(_){el.focus();}
-      }
-    };
-    el.addEventListener('pointermove',move);
-    el.addEventListener('pointerup',up,{once:true});
-    el.addEventListener('pointercancel',up,{once:true});
-  });
-  el.addEventListener('focus',()=>selectCanvasItem(id));
-  el.addEventListener('input',()=>{el.dataset.userEdited='1';});
-}
-function bindCanvasDraggable(){
-  CANVAS_ITEMS.forEach(bindSingleCanvasItem);
-  const board=document.getElementById('canvas-artboard');
-  if(board&&!board.dataset.deselectReady){board.dataset.deselectReady='1';board.addEventListener('pointerdown',e=>{if(e.target===board)selectCanvasItem(null);});}
-  selectCanvasItem(canvasDesign.selected);
-}
-function setCanvasPresetText(text){
-  const pairs=[['canvas-kicker',text.kicker],['canvas-title',text.title],['canvas-copy',text.copy]];
-  pairs.forEach(([id,val])=>{const el=document.getElementById(id); if(el&&!el.dataset.userEdited){ if(id==='canvas-title')el.innerHTML=val; else el.textContent=val; }});
-}
-function canvasControlsHTML(){
-  const opts=Object.entries(CANVAS_FONTS).map(([v,l])=>'<option value="'+v+'" '+(canvasDesign.font===v?'selected':'')+'>'+l+'</option>').join('');
-  const selectedEl=document.getElementById(canvasDesign.selected);
-  const selectedScale=selectedEl?Math.round((parseFloat(selectedEl.dataset.scale||'1'))*100):100;
-  return '<div class="canvas-font-controls">'+
-    '<div class="canvas-selected-row"><div class="canvas-control-label" id="canvas-selected-label">Titular</div><select class="canvas-select canvas-select-compact" id="canvas-font-select">'+opts+'</select></div>'+ 
-    '<div><div class="canvas-size-row"><input class="canvas-range" id="canvas-title-size" type="range" min="44" max="150" value="'+canvasDesign.titleSize+'"><input class="canvas-input-mini" id="canvas-title-num" type="number" min="44" max="150" value="'+canvasDesign.titleSize+'"></div></div>'+ 
-    '<div><div class="canvas-size-row"><input class="canvas-range" id="canvas-copy-size" type="range" min="10" max="46" value="'+canvasDesign.copySize+'"><input class="canvas-input-mini" id="canvas-copy-num" type="number" min="10" max="46" value="'+canvasDesign.copySize+'"></div></div>'+ 
-    '<div><div class="canvas-size-row"><input class="canvas-range" id="canvas-selected-scale" type="range" min="40" max="220" value="'+selectedScale+'"><input class="canvas-input-mini" id="canvas-selected-scale-num" type="number" min="40" max="220" value="'+selectedScale+'"></div></div>'+ 
-    '<div class="canvas-tool-grid"><button class="canvas-btn primary" id="canvas-center-selected">Centrar elemento</button><button class="canvas-btn" id="canvas-reset-layout">Reset layout</button></div>'+ 
-  '</div><div class="canvas-elements-panel"><div class="canvas-element-grid"><button class="canvas-btn" data-add-canvas="text">Texto</button><button class="canvas-btn" data-add-canvas="star">Estrella</button><button class="canvas-btn" data-add-canvas="line">Línea</button><button class="canvas-btn" data-add-canvas="circle">Círculo</button><button class="canvas-btn" data-add-canvas="frame">Marco</button></div></div>';
-}
-function bindCanvasControls(){
-  const fs=document.getElementById('canvas-font-select'); if(fs)fs.onchange=()=>{canvasDesign.font=fs.value;applyCanvasDesign();};
-  const ts=document.getElementById('canvas-title-size'), tn=document.getElementById('canvas-title-num');
-  const cs=document.getElementById('canvas-copy-size'), cn=document.getElementById('canvas-copy-num');
-  const setTitle=v=>{canvasDesign.titleSize=Math.max(44,Math.min(150,+v||92)); if(ts)ts.value=canvasDesign.titleSize;if(tn)tn.value=canvasDesign.titleSize;applyCanvasDesign();};
-  const setCopy=v=>{canvasDesign.copySize=Math.max(10,Math.min(46,+v||22)); if(cs)cs.value=canvasDesign.copySize;if(cn)cn.value=canvasDesign.copySize;applyCanvasDesign();};
-  if(ts)ts.oninput=()=>setTitle(ts.value); if(tn)tn.onchange=()=>setTitle(tn.value);
-  if(cs)cs.oninput=()=>setCopy(cs.value); if(cn)cn.onchange=()=>setCopy(cn.value);
-  const ss=document.getElementById('canvas-selected-scale'), ssn=document.getElementById('canvas-selected-scale-num');
-  const setSelScale=v=>{if(!canvasDesign.selected)return; const el=document.getElementById(canvasDesign.selected); if(!el)return; const sc=Math.max(40,Math.min(220,+v||100)); el.dataset.scale=(sc/100).toFixed(2); if(ss)ss.value=sc;if(ssn)ssn.value=sc; transformCanvasItem(el);};
-  if(ss)ss.oninput=()=>setSelScale(ss.value); if(ssn)ssn.onchange=()=>setSelScale(ssn.value);
-  const center=document.getElementById('canvas-center-selected'); if(center)center.onclick=()=>{if(!canvasDesign.selected)return; const el=document.getElementById(canvasDesign.selected); if(el){el.dataset.x='50';el.dataset.center='true';positionCanvasItem(el);selectCanvasItem(el.id);}};
-  document.querySelectorAll('[data-add-canvas]').forEach(b=>b.onclick=()=>addCanvasElement(b.dataset.addCanvas));
-  const reset=document.getElementById('canvas-reset-layout'); if(reset)reset.onclick=()=>resetCanvasLayout();
-  selectCanvasItem(canvasDesign.selected);
-}
-function addCanvasElement(type){
-  const board=document.getElementById('canvas-artboard'); if(!board)return;
-  const id='canvas-extra-'+Date.now();
-  const el=document.createElement('div');
-  el.id=id; el.className='canvas-item canvas-extra'; el.dataset.x='50'; el.dataset.y='50'; el.dataset.center='true'; el.dataset.scale='1'; el.dataset.shape=type;
-  const labels={text:'Texto libre',star:'Estrella',line:'Línea',circle:'Círculo',frame:'Marco'}; el.dataset.label=labels[type]||'Elemento';
-  if(type==='text'){el.contentEditable='true';el.spellcheck=false;el.textContent='NEW TEXT';}
-  else if(type==='star'){el.textContent='✦';}
-  else {el.setAttribute('aria-label',labels[type]||'Elemento');}
-  board.appendChild(el); CANVAS_ITEMS.push(id); canvasDesign.selected=id; bindSingleCanvasItem(id); positionCanvasItem(el); selectCanvasItem(id); bindCanvasControls();
-}
-function deleteCanvasElement(id){
-  if(['canvas-title','canvas-kicker','canvas-copy','canvas-cta','canvas-star-left','canvas-star-right','canvas-line-left','canvas-line-right'].includes(id))return;
-  const el=document.getElementById(id); if(el)el.remove();
-  const idx=CANVAS_ITEMS.indexOf(id); if(idx>=0)CANVAS_ITEMS.splice(idx,1);
-  canvasDesign.selected=null; selectCanvasItem(null); bindCanvasControls();
-}
-function resetCanvasLayout(){
-  const pos={
-    'canvas-star-left':[14,24,false],'canvas-star-right':[86,24,false],'canvas-title':[50,22,true],'canvas-kicker':[50,62,true],
-    'canvas-line-left':[18,73,false],'canvas-copy':[50,70,true],'canvas-line-right':[66,73,false],'canvas-cta':[50,82,true]
-  };
-  Object.entries(pos).forEach(([id,[x,y,c]])=>{const el=document.getElementById(id); if(el){el.dataset.x=x;el.dataset.y=y;if(c)el.dataset.center='true';else delete el.dataset.center;el.dataset.scale='1';positionCanvasItem(el);}});
-}
-function canvasTextForProfile(){
-  const prof=activeProfId?getProfs().find(p=>p.id===activeProfId):null;
-  if(!prof)return{chip:'Sin perfil activo',kicker:'HOUSE & DISCO',title:'NU<br>AMOR',copy:'BYRON BAY'};
-  return{chip:'Perfil: '+prof.name,kicker:(prof.tag||'HOUSE & DISCO').toUpperCase(),title:(prof.name||'TU PERFIL').toUpperCase().replace(/\s+/g,'<br>'),copy:'BOCETO VISUAL'};
-}
-function renderCanvasTest(){
-  const wrap=document.getElementById('canvas-control-content');
-  const canvas=document.getElementById('test-canvas');
-  if(!wrap||!canvas)return;
-  const text=canvasTextForProfile();
-  document.getElementById('canvas-prof-chip').textContent=text.chip;
-  applyCanvasDesign(); bindCanvasDraggable(); setCanvasPresetText(text);
-  if(!slotA||!slotB){
-    const bg=slotA?slotA.hex:'var(--bg-card)'; const fg=slotB?slotB.hex:'var(--ink)';
-    canvas.style.background=bg;canvas.style.color=fg;
-    wrap.innerHTML='<div class="canvas-empty">Selecciona Color A y Color B en Rueda de Colores para probarlos aquí.<br>Color A = fondo · Color B = texto</div><div class="canvas-actions"><button class="canvas-btn" id="canvas-go-compare">Ir a Rueda de Colores</button></div>'+canvasControlsHTML();
-    bindCanvasControls(); const go=document.getElementById('canvas-go-compare');if(go)go.addEventListener('click',()=>btnC.click()); return;
-  }
-  canvas.style.background=slotA.hex; canvas.style.color=slotB.hex;
-  const cr=contrast(slotA.hex,slotB.hex); const aaNormal=cr>=4.5, aaLarge=cr>=3;
-  let score=Math.min(100,Math.round((cr/7)*100)); if(score>100)score=100;
-  let verdict='Bajo para texto pequeño. Puede servir como recurso gráfico, pero no como lectura principal.';
-  if(aaNormal)verdict='Muy buena legibilidad para texto normal. La combinación aguanta bien en una interfaz o cartel.';
-  else if(aaLarge)verdict='Funciona para titulares grandes, pero sería débil para párrafos o botones pequeños.';
-  const sc=scoreComp(slotA,slotB); const prof=activeProfId?getProfs().find(p=>p.id===activeProfId):null;
-  const profileNote=prof?' Perfil activo: '+prof.name+'.':' Sin perfil activo.';
-  wrap.innerHTML='<div class="canvas-color-row"><div class="canvas-color-card"><div class="canvas-swatch" style="background:'+slotA.hex+'"></div><div class="canvas-label">Color A · Fondo</div><div class="canvas-hex">'+slotA.hex.toUpperCase()+'</div><div class="canvas-name">'+slotA.name+'</div>'+(slotA.isExact?'<div class="approx-note">HEX exacto · marcador aproximado en rueda</div>':'')+'</div><div class="canvas-color-card"><div class="canvas-swatch" style="background:'+slotB.hex+'"></div><div class="canvas-label">Color B · Texto</div><div class="canvas-hex">'+slotB.hex.toUpperCase()+'</div><div class="canvas-name">'+slotB.name+'</div>'+(slotB.isExact?'<div class="approx-note">HEX exacto · marcador aproximado en rueda</div>':'')+'</div></div>'+ 
-    '<div class="canvas-score"><div class="canvas-score-top"><div class="canvas-score-title">Contraste texto/fondo</div><div class="canvas-score-num">'+cr.toFixed(2)+':1</div></div><div class="canvas-meter"><div class="canvas-meter-fill" style="width:'+score+'%"></div></div><div class="canvas-note">'+verdict+profileNote+'</div></div>'+ 
-    '<div class="canvas-score"><div class="canvas-score-top"><div class="canvas-score-title">Armonía cromática</div><div class="canvas-score-num">'+sc.ov+'/100</div></div><div class="canvas-meter"><div class="canvas-meter-fill" style="width:'+sc.ov+'%"></div></div><div class="canvas-note">'+sc.ht+' · '+sc.vd+'</div></div>'+ 
-    '<div class="canvas-actions"><button class="canvas-btn" id="canvas-swap">Intercambiar A/B</button><button class="canvas-btn" id="canvas-go-compare">Editar colores</button></div>'+canvasControlsHTML();
-  bindCanvasControls(); bindCanvasDraggable();
-  const swap=document.getElementById('canvas-swap');if(swap)swap.addEventListener('click',()=>{const tmp=slotA;slotA=slotB;slotB=tmp;updateSlotBox('a',slotA);updateSlotBox('b',slotB);refreshExactMarkers();renderCanvasTest();});
-  const go=document.getElementById('canvas-go-compare');if(go)go.addEventListener('click',()=>btnC.click());
+function transformCanvasItem() {
+  /* v11.1.5: delegate to Canvas V2 */
+  return window.CanvasV2 && window.CanvasV2.render('legacy-transformCanvasItem');
 }
 
 // ── PROFILES ──
@@ -8826,7 +8452,7 @@ var CanvasV2State = (function () {
 
 
 /* ── src/modules/canvas-v2/canvas-v2-ui.js ── */
-/* ── canvas-v2-ui.js — v11.1.4: Canvas Preview Full Visual Layout ──
+/* ── canvas-v2-ui.js — v11.1.5: Legacy Canvas Cleanup ──
    Depends on: CanvasV2State (canvas-v2-state.js must load first).
 
    New in v11.1.0:
@@ -8858,6 +8484,9 @@ var CanvasV2State = (function () {
    - Root: padding:14px 0 on mobile (no horizontal padding — artboard owns its own margins)
    - Controls: width:min(calc(100vw-24px),520px), centered via margin:0 auto
    - Desktop: #canvas-v2-preview gets align-items:center globally
+
+   New in v11.1.5 (Legacy Canvas Cleanup):
+   - Removed .canvas-layout / #canvas-legacy-layout hiding rules (DOM gone)
 */
 
 var CanvasV2UI = (function () {
@@ -9074,9 +8703,7 @@ var CanvasV2UI = (function () {
         'letter-spacing:.1em;color:var(--ink-dim);text-align:center;opacity:.45;' +
         'margin-top:8px;padding:0;}',
 
-      /* ── Legacy canvas hidden when Canvas V2 active ── */
-      '#view-canvas[data-cv2="1"] .canvas-layout{display:none!important;}',
-      '#view-canvas[data-cv2="1"] #canvas-legacy-layout{display:none!important;}'
+      /* ── Legacy canvas DOM removed in v11.1.5 — hiding rules no longer needed ── */
 
     ].join('\n');
     document.head.appendChild(s);
@@ -9690,7 +9317,7 @@ var CanvasV2UI = (function () {
 
 
 /* ── src/modules/canvas-v2/canvas-v2-index.js ── */
-/* ── canvas-v2-index.js — v11.1.4: Canvas Preview Full Visual Layout ──
+/* ── canvas-v2-index.js — v11.1.5: Legacy Canvas Cleanup ──
    Depends on: CanvasV2State (canvas-v2-state.js) + CanvasV2UI (canvas-v2-ui.js).
 
    New in v11.1.0:
@@ -9722,12 +9349,21 @@ var CanvasV2UI = (function () {
    New in v11.1.4 (Canvas Preview Full Visual Layout):
    - VERSION v11.1.4
    - __canvasV2Debug(): +previewFullLayout, +previewCentered, +artboardLeft, +viewportWidth
+
+   New in v11.1.5 (Legacy Canvas Cleanup):
+   - VERSION v11.1.5
+   - Legacy canvas DOM removed from template.html (#test-canvas, #canvas-artboard, .canvas-item elements)
+   - Legacy canvas CSS removed from template.html (.canvas-layout, .canvas-stage, .canvas-panel, etc.)
+   - Legacy canvas functions in wheel.js replaced with compatibility stubs
+   - setCanvasEdit / installCanvasToggle in v83-appcore.js neutralized (no-op)
+   - __canvasV2Debug(): +legacyCleanup, +legacyCanvasDomCount, +legacyCanvasCssDetected,
+     +oldMobileToggleExists, +oldCanvasVisible
 */
 
 (function () {
   'use strict';
 
-  var VERSION = 'v11.1.4';
+  var VERSION = 'v11.1.5';
 
   /* ─────────────────────────────────────────────
      PRIVATE STATE
@@ -10370,6 +10006,43 @@ var CanvasV2UI = (function () {
       }
     } catch (_) {}
 
+    /* v11.1.5: legacy canvas cleanup verification */
+    result.legacyCleanup = true;
+    try {
+      var legacyDomSelectors = [
+        '#test-canvas', '#canvas-artboard', '#canvas-legacy-layout',
+        '.canvas-item', '#mobile-canvas-edit-toggle', '#canvas-mobile-controls-root',
+        '#canvas-control-content'
+      ];
+      var legacyCount = 0;
+      legacyDomSelectors.forEach(function (sel) {
+        legacyCount += document.querySelectorAll(sel).length;
+      });
+      result.legacyCanvasDomCount = legacyCount;
+
+      /* legacyCanvasCssDetected: check if any legacy canvas CSS rule is still injected
+         by looking for a known legacy class in any injected stylesheet */
+      var cssDetected = false;
+      try {
+        Array.from(document.styleSheets).forEach(function (sheet) {
+          try {
+            Array.from(sheet.cssRules || []).forEach(function (rule) {
+              if (rule.selectorText && /\.canvas-item(?!\S)/.test(rule.selectorText)) {
+                cssDetected = true;
+              }
+            });
+          } catch (_) {}
+        });
+      } catch (_) {}
+      result.legacyCanvasCssDetected = cssDetected;
+
+      result.oldMobileToggleExists = !!document.getElementById('mobile-canvas-edit-toggle');
+      var legacyCanvas = document.getElementById('test-canvas');
+      result.oldCanvasVisible = legacyCanvas
+        ? legacyCanvas.style.display !== 'none' && !legacyCanvas.closest('[style*="display: none"]')
+        : false;
+    } catch (_) {}
+
     console.table(result);
     try { console.table(result.colors); } catch (_) {}
     try { console.table(result.colorSync); } catch (_) {}
@@ -10389,7 +10062,7 @@ var CanvasV2UI = (function () {
 
 
 /* ── src/modules/canvas-v2/canvas-v2-persistence.js ── */
-/* ── canvas-v2-persistence.js — v11.1.4: Canvas V2 Color Sync Fix ──
+/* ── canvas-v2-persistence.js — v11.1.5: Canvas V2 Color Sync Fix ──
    Depends on: CanvasV2State, CanvasV2UI, CanvasV2 (all loaded before this file).
    Publishes: window.CanvasV2Persistence, window.__cv2ForceSave, window.__cv2StorageDump
 
@@ -10807,7 +10480,7 @@ var CanvasV2UI = (function () {
       setVal('cv2-qa-reason',       _lastSaveReasonStr);
       setVal('cv2-qa-action',       _lastActionStr);
       setVal('cv2-qa-loaded-title', _lastLoadedTitleStr);
-      /* Color sync fields (v11.1.4) */
+      /* Color sync fields (v11.1.5) */
       try {
         var qColors = CanvasV2State.getColors();
         setVal('cv2-qa-color-a',      qColors.a);
@@ -10850,7 +10523,7 @@ var CanvasV2UI = (function () {
     var panel = document.createElement('div');
     panel.id = 'cv2-qa-panel';
     panel.innerHTML =
-      '<div class="cv2-qa-heading">' + (isEN ? 'Canvas QA v11.1.4' : 'Prueba de Canvas v11.1.4') + '</div>' +
+      '<div class="cv2-qa-heading">' + (isEN ? 'Canvas QA v11.1.5' : 'Prueba de Canvas v11.1.5') + '</div>' +
       '<div class="cv2-qa-grid">' +
         row(isEN ? 'Scope'             : 'Ámbito',              'cv2-qa-scope',
             scope.type + (scope.profileId ? ' (' + scope.profileId.slice(0,8) + ')' : '')) +
@@ -10921,7 +10594,7 @@ var CanvasV2UI = (function () {
       });
     }
 
-    /* Button: test color sync (v11.1.4) */
+    /* Button: test color sync (v11.1.5) */
     var btnColorSync = document.getElementById('cv2-qa-btn-color-sync');
     if (btnColorSync) {
       btnColorSync.addEventListener('click', function () {
@@ -11016,7 +10689,7 @@ var CanvasV2UI = (function () {
     var ok0 = loadNow('boot');
     if (!ok0) console.info('[CanvasV2P] no saved state at boot — using defaults');
 
-    console.info('[CanvasV2P] v11.1.4 persistence installed');
+    console.info('[CanvasV2P] v11.1.5 persistence installed');
   }
 
   /* ─────────────────────────────────────────────
@@ -11048,7 +10721,7 @@ var CanvasV2UI = (function () {
 
       base.persistence = {
         persistenceEnabled:         true,
-        version:                    'v11.1.4',
+        version:                    'v11.1.5',
         previewSelectionEnabled:    true,
         currentScope:               scope.type,
         currentProfileId:           scope.profileId,
@@ -11178,7 +10851,7 @@ var CanvasV2UI = (function () {
     console.warn('[CanvasV2P] CanvasV2 not found at load time — persistence not installed');
   }
 
-  console.info('[CanvasV2P] v11.1.4 canvas-v2-persistence.js loaded');
+  console.info('[CanvasV2P] v11.1.5 canvas-v2-persistence.js loaded');
 
 })();
 
