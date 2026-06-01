@@ -9717,6 +9717,16 @@ var CanvasV2UI = (function () {
    - __canvasV2Debug().directManipulation: mobileDragEnabled/mobileResizeEnabled now true
      on mobile; pinch fields added.
 
+   New in v11.2.9a (Pinch follows fingers):
+   - VERSION v11.2.9a
+   - Pinch now translates the element by the centroid delta of the two fingers
+     (scale + move together) so it stays under your fingers instead of growing
+     from its anchor point. Fixes the "doesn't follow the fingers" feel.
+   - _pinch gains startCx/startCy (start centroid) + startElX/startElY (start pos).
+   - _pinchCentroid() helper added.
+   - _onPinchPointerMove: updateElement now patches {size, x, y}; live DOM +
+     controls readout updated for position too.
+
    v11.2.3 (Canvas Inline Text Editing) — REVERTED in v11.2.3a.
    The positioned <textarea> overlay destabilized controls: its blur-to-commit
    handler called renderControls() while the user was clicking the dropdown,
@@ -9738,7 +9748,7 @@ var CanvasV2UI = (function () {
 (function () {
   'use strict';
 
-  var VERSION = 'v11.2.9';
+  var VERSION = 'v11.2.9a';
 
   /* ─────────────────────────────────────────────
      PRIVATE STATE
@@ -10145,7 +10155,7 @@ var CanvasV2UI = (function () {
   /* v11.2.9: all currently-down pointers (cleared on pointerup/cancel) */
   var _activePointers = {}; /* pointerId → {x, y} */
 
-  /* v11.2.9: pinch-to-resize state (mirrors _drag/_resize pattern) */
+  /* v11.2.9 / v11.2.9a: pinch-to-resize state (mirrors _drag/_resize pattern) */
   var _pinch = {
     active:    false,
     id:        null,
@@ -10153,6 +10163,12 @@ var CanvasV2UI = (function () {
     pid2:      null,
     startDist: 0,
     startSize: 0,
+    /* v11.2.9a: centroid + element position at pinch start — element follows
+       the midpoint of the two fingers (scale + translate together). */
+    startCx:   0,
+    startCy:   0,
+    startElX:  0,
+    startElY:  0,
     szMin:     0,
     szMax:     0,
     moved:     false,
@@ -10205,6 +10221,15 @@ var CanvasV2UI = (function () {
     var p2 = _activePointers[keys[1]];
     var dx = p1.x - p2.x, dy = p1.y - p2.y;
     return Math.sqrt(dx * dx + dy * dy);
+  }
+
+  /* v11.2.9a: midpoint (centroid) between the two tracked touch pointers */
+  function _pinchCentroid() {
+    var keys = Object.keys(_activePointers);
+    if (keys.length < 2) return null;
+    var p1 = _activePointers[keys[0]];
+    var p2 = _activePointers[keys[1]];
+    return { x: (p1.x + p2.x) / 2, y: (p1.y + p2.y) / 2 };
   }
 
   function _installDragHandlers() {
@@ -10448,12 +10473,19 @@ var CanvasV2UI = (function () {
     var isText  = CanvasV2State.isTextElement(selId);
     var isShape = CanvasV2State.isShapeElement(selId);
 
+    var startCentroid = _pinchCentroid() || { x: 0, y: 0 };
+
     _pinch.active    = true;
     _pinch.id        = selId;
     _pinch.pid1      = Number(pointerIds[0]);
     _pinch.pid2      = Number(pointerIds[1]);
     _pinch.startDist = _pinchDist();
     _pinch.startSize = el.size != null ? el.size : 14;
+    /* v11.2.9a: anchor for follow-the-fingers translation */
+    _pinch.startCx   = startCentroid.x;
+    _pinch.startCy   = startCentroid.y;
+    _pinch.startElX  = el.x != null ? el.x : 50;
+    _pinch.startElY  = el.y != null ? el.y : 50;
     _pinch.moved     = false;
     _pinch.lastPinchStart = new Date().toISOString();
     if (isText)                              { _pinch.szMin = 6;  _pinch.szMax = 180; }
@@ -10484,17 +10516,54 @@ var CanvasV2UI = (function () {
     _pinch.moved = true;
     _pinch.lastPinchSize = Math.round(newSize * 10) / 10;
 
-    CanvasV2State.updateElement(_pinch.id, { size: newSize });
+    /* ── v11.2.9a: element follows the centroid of the two fingers ──
+       Translate by the centroid's pixel delta (converted to artboard %),
+       so the element stays "under" your fingers while it scales. */
+    var newX = _pinch.startElX;
+    var newY = _pinch.startElY;
+    var artboard = document.getElementById('cv2-artboard');
+    var centroid = _pinchCentroid();
+    if (artboard && centroid) {
+      var rect = artboard.getBoundingClientRect();
+      if (rect.width && rect.height) {
+        var cdx = centroid.x - _pinch.startCx;
+        var cdy = centroid.y - _pinch.startCy;
+        var rawX = _pinch.startElX + (cdx / rect.width  * 100);
+        var rawY = _pinch.startElY + (cdy / rect.height * 100);
+        newX = Math.min(100, Math.max(0, isNaN(rawX) ? _pinch.startElX : rawX));
+        newY = Math.min(100, Math.max(0, isNaN(rawY) ? _pinch.startElY : rawY));
+      }
+    }
+
+    CanvasV2State.updateElement(_pinch.id, { size: newSize, x: newX, y: newY });
 
     /* Lightweight DOM update */
     var itemEl = document.getElementById('cv2-item-' + _pinch.id);
-    if (itemEl) itemEl.style.fontSize = newSize + 'px';
+    if (itemEl) {
+      itemEl.style.fontSize = newSize + 'px';
+      itemEl.style.left = newX + '%';
+      itemEl.style.top  = newY + '%';
+    }
 
-    /* Live controls readout */
+    /* Move selected-element label in sync */
+    try {
+      var selLabel = artboard && artboard.querySelector('.cv2-sel-label');
+      if (selLabel) {
+        selLabel.style.left = newX + '%';
+        selLabel.style.top  = Math.max(2, newY - 5) + '%';
+      }
+    } catch (_) {}
+
+    /* Live controls readout — size + position */
     try {
       var szvEl    = document.getElementById('cv2-szv');     if (szvEl)    szvEl.textContent  = Math.round(newSize);
       var szvAdv   = document.getElementById('cv2-szv-adv'); if (szvAdv)   szvAdv.textContent = Math.round(newSize);
       var szSlider = document.getElementById('cv2-sz');      if (szSlider) szSlider.value      = Math.round(newSize);
+      var posDisp  = document.getElementById('cv2-pos-disp'); if (posDisp) posDisp.textContent = 'X: ' + Math.round(newX) + ' · Y: ' + Math.round(newY);
+      var xSlider  = document.getElementById('cv2-x');  if (xSlider) xSlider.value = Math.round(newX);
+      var xValEl   = document.getElementById('cv2-xv'); if (xValEl)  xValEl.textContent = Math.round(newX);
+      var ySlider  = document.getElementById('cv2-y');  if (ySlider) ySlider.value = Math.round(newY);
+      var yValEl   = document.getElementById('cv2-yv'); if (yValEl)  yValEl.textContent = Math.round(newY);
     } catch (_) {}
   }
 
