@@ -540,6 +540,11 @@ h1 em{font-weight:800;font-style:normal;color:var(--accent);}
 .predominant-meta{padding:9px 10px;}
 .predominant-name{font-family:'Fraunces',serif;font-size:15px;font-style:italic;line-height:1.1;}
 .predominant-pop{font-family:'JetBrains Mono',monospace;font-size:8px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-dim);margin-top:3px;}
+/* v11.2.10: assign a detected color to slot A or B */
+.predominant-pick{display:flex;gap:6px;padding:0 10px 10px;}
+.predominant-pick-btn{flex:1;font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.1em;font-weight:600;padding:7px 0;border-radius:9px;border:1px solid var(--line);background:var(--bg-card);color:var(--ink);cursor:pointer;transition:all .18s var(--ease-yin);}
+.predominant-pick-btn:hover{border-color:var(--accent);color:var(--accent);}
+.predominant-pick-btn.is-picked{background:var(--accent);border-color:var(--accent);color:#0a0a0f;}
 .analysis-suggestions{
   display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px;margin-top:10px;
 }
@@ -615,7 +620,8 @@ h1 em{font-weight:800;font-style:normal;color:var(--accent);}
 :root[data-theme="light"] .btn-pa[data-act]:hover{border-color:var(--ok)!important;background:rgba(15,122,61,.16)!important;color:var(--ok-strong)!important;}
 .sug-more-btn:disabled{opacity:.4;cursor:default;}
 /* MODAL */
-.modal-ov{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:360;display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity .2s;}
+/* v11.2.10: modals (new profile / save palette) sit ABOVE the identity tour (z-980) and profile panel (z-250) — user-initiated dialogs always win focus order. */
+.modal-ov{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:990;display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity .2s;}
 .modal-ov.open{opacity:1;pointer-events:all;}
 .modal{background:var(--bg-soft);border:1px solid var(--line);border-radius:16px;padding:22px;width:320px;position:relative;box-shadow:0 28px 80px rgba(0,0,0,.38);}
 .modal::before{content:'';position:absolute;top:-1px;left:-1px;right:-1px;height:2px;background:linear-gradient(90deg,transparent,var(--accent),transparent);}
@@ -4182,12 +4188,21 @@ document.getElementById('modal-prof').addEventListener('click',e=>{if(e.target==
 function createProf(){
   const name=document.getElementById('prof-name-in').value.trim();if(!name)return;
   const tag=document.getElementById('prof-tag-in').value.trim();
-  let profs=getProfs();
-  let id=slugId(name,'prof');
-  if(profs.some(p=>p.id===id))id=id+'_'+Date.now();
-  profs.push({id,name,tag,flyers:[],created:Date.now()});
-  setProfs(profs);
-  activeProfId=id;localStorage.setItem('np_active_profile',activeProfId);
+  /* v11.2.10: route through the official action so the profile lands in AppState
+     (the v10 source of truth) and save() writes BOTH colorWheelApp_v1 and the
+     legacy keys. The old direct setProfs() write was clobbered by the next
+     AppStorage.save() → the profile vanished ("created but empty"). */
+  if(window.AppActions&&typeof AppActions.createProfile==='function'){
+    AppActions.createProfile({name,tag});
+    try{if(window.activeProfId)localStorage.setItem('np_active_profile',window.activeProfId);}catch(_){}
+  }else{
+    let profs=getProfs();
+    let id=slugId(name,'prof');
+    if(profs.some(p=>p.id===id))id=id+'_'+Date.now();
+    profs.push({id,name,tag,flyers:[],created:Date.now()});
+    setProfs(profs);
+    activeProfId=id;localStorage.setItem('np_active_profile',activeProfId);
+  }
   document.getElementById('modal-prof').classList.remove('open');
   ensureCoreProfiles();renderProfList();renderPalList();updateProfileAvatar();renderActiveProfBar();
 }
@@ -4645,19 +4660,22 @@ function renderProfileAnalysis(colors){
   result.classList.add('open');
   grid.innerHTML=colors.map((c,i)=>{
     const name=getColorName(c);
-    return '<div class="predominant-card">'+
+    return '<div class="predominant-card" data-hex="'+c+'">'+
       '<div class="predominant-square" style="background:'+c+'"><span class="predominant-code">'+c+'</span></div>'+
       '<div class="predominant-meta"><div class="predominant-name">'+(name.tech||name)+'</div><div class="predominant-pop">'+(name.popular||'Color '+(i+1))+'</div></div>'+
+      '<div class="predominant-pick"><button type="button" class="predominant-pick-btn" data-pick="a" data-hex="'+c+'">Color A</button><button type="button" class="predominant-pick-btn" data-pick="b" data-hex="'+c+'">Color B</button></div>'+
       '</div>';
   }).join('');
   const dominant=colors[0], accent=colors[1]||colors[0], support=colors[2]||colors[0];
   const active=activeProfId?getProfs().find(p=>p.id===activeProfId):null;
   const profileName=active?active.name:'perfil actual';
   const cAName=getColorName(dominant), cBName=getColorName(accent);
-  const contrast=contrastRatio(dominant,accent);
+  /* v11.2.10: was contrastRatio() (undefined) → threw, making image analysis appear
+     to fail. The real helper is contrast(); avoid shadowing it with the local var. */
+  const contrastVal=contrast(dominant,accent);
   sug.innerHTML=
     '<div class="analysis-suggestion"><strong>Base visual</strong>Usaría '+dominant+' como fondo/base principal para '+profileName+'. Técnicamente es '+(cAName.tech||cAName)+'.</div>'+
-    '<div class="analysis-suggestion"><strong>Acento / texto</strong>'+accent+' funciona como acento o texto principal. Contraste aproximado con la base: '+contrast.toFixed(2)+' : 1.</div>'+
+    '<div class="analysis-suggestion"><strong>Acento / texto</strong>'+accent+' funciona como acento o texto principal. Contraste aproximado con la base: '+contrastVal.toFixed(2)+' : 1.</div>'+
     '<div class="analysis-suggestion"><strong>Soporte</strong>'+support+' puede servir para detalles, líneas, botones secundarios o una segunda edición del mismo perfil.</div>';
 }
 function createProfileFromAnalysis(){
@@ -4666,15 +4684,24 @@ function createProfileFromAnalysis(){
   const name=prompt('Nombre del nuevo perfil',baseName);
   if(!name)return;
   const tag=prompt('Categoría / contexto del perfil','Referencia visual')||'Referencia visual';
-  const id='prof_'+Date.now();
-  const profs=getProfs();
-  profs.unshift({id,name,tag,flyers:[],created:Date.now(),source:'image-analysis'});
-  setProfs(profs);
   const colors=lastProfileAnalysisColors.slice(0,4);
-  const pals=getPals();
-  pals.unshift({id:'pal_'+Date.now(),name:name+' — Dominantes',colors,note:'Creado desde imagen · '+colors.join(' · '),profId:id});
-  setPals(pals);
-  activateProfile(id);
+  /* v11.2.10: official action path (AppState source of truth) — same clobber fix as createProf */
+  if(window.AppActions&&typeof AppActions.createProfile==='function'){
+    const prof=AppActions.createProfile({name,tag,source:'image-analysis'});
+    if(prof&&colors.length&&typeof AppActions.savePalette==='function'){
+      AppActions.savePalette({name:name+' — Dominantes',colors,note:'Creado desde imagen · '+colors.join(' · '),profId:prof.id});
+    }
+    try{if(window.activeProfId)localStorage.setItem('np_active_profile',window.activeProfId);}catch(_){}
+  }else{
+    const id='prof_'+Date.now();
+    const profs=getProfs();
+    profs.unshift({id,name,tag,flyers:[],created:Date.now(),source:'image-analysis'});
+    setProfs(profs);
+    const pals=getPals();
+    pals.unshift({id:'pal_'+Date.now(),name:name+' — Dominantes',colors,note:'Creado desde imagen · '+colors.join(' · '),profId:id});
+    setPals(pals);
+    activateProfile(id);
+  }
   renderProfList();
   const st=document.getElementById('profile-analysis-status');if(st)st.textContent='Perfil creado y activado con los colores de la imagen.';
 }
@@ -4712,10 +4739,41 @@ function setupProfileAnalyser(){
   }
   const create=document.getElementById('analysis-create-profile');
   if(create)create.addEventListener('click',createProfileFromAnalysis);
+  /* v11.2.10: assign a detected color to Color A/B via the official action.
+     The whole point: let the user CHOOSE which extracted color is A and which is B,
+     not just auto-use dominant/accent. AppActions.setColorA/B is the source-of-truth
+     path (updates wheel, compare, canvas, persists). */
+  function pickAnalysisColor(slot,hex){
+    if(!hex||typeof exactColorItem!=='function')return;
+    hex=String(hex).toUpperCase();
+    /* Use the wheel's OWN slot mechanism (module-scoped slotA/slotB + exactColorItem),
+       exactly like the custom picker's applyHex(). Going through AppActions.setColorA
+       only sets window.slotA, which a later syncColorsToAppState() (reading wheel.js's
+       own slotA) would clobber back. exactColorItem keeps the EXACT hex (isExact:true). */
+    const item=exactColorItem(hex,slot==='a'?'Color A desde imagen':'Color B desde imagen');
+    cSlot=slot;
+    if(slot==='a'){clearSlotClass(slotA,'slot-a');slotA=item;updateSlotBox('a',item);}
+    else{clearSlotClass(slotB,'slot-b');slotB=item;updateSlotBox('b',item);}
+    highlightSlot();refreshExactMarkers();
+    if(slotA&&slotB)renderCompare();else if(slotA&&!slotB)renderColorBAdvisor();
+    if(typeof updateSaveBtn==='function')updateSaveBtn();
+    renderCanvasTest();
+    const grid=document.getElementById('predominant-grid');
+    if(grid){grid.querySelectorAll('.predominant-pick-btn[data-pick="'+slot+'"]').forEach(b=>b.classList.toggle('is-picked',b.dataset.hex&&b.dataset.hex.toUpperCase()===hex));}
+    const st=document.getElementById('profile-analysis-status'); if(st)st.textContent='Color '+slot.toUpperCase()+' = '+hex;
+  }
+  const predGrid=document.getElementById('predominant-grid');
+  if(predGrid&&!predGrid.dataset.pickBound){
+    predGrid.dataset.pickBound='1';
+    predGrid.addEventListener('click',e=>{
+      const btn=e.target.closest('.predominant-pick-btn'); if(!btn)return;
+      pickAnalysisColor(btn.dataset.pick,btn.dataset.hex);
+    });
+  }
   const useA=document.getElementById('analysis-use-a');
   const useB=document.getElementById('analysis-use-b');
-  if(useA)useA.addEventListener('click',()=>{if(lastProfileAnalysisColors[0]){slotA=lastProfileAnalysisColors[0];cSlot='b';updateSelectionUI();drawWheel();updateCanvas();}});
-  if(useB)useB.addEventListener('click',()=>{if(lastProfileAnalysisColors[1]||lastProfileAnalysisColors[0]){slotB=lastProfileAnalysisColors[1]||lastProfileAnalysisColors[0];cSlot='b';updateSelectionUI();drawWheel();updateCanvas();}});
+  if(useA)useA.addEventListener('click',()=>pickAnalysisColor('a',lastProfileAnalysisColors[0]));
+  if(useB)useB.addEventListener('click',()=>pickAnalysisColor('b',lastProfileAnalysisColors[1]||lastProfileAnalysisColors[0]));
 }
 setTimeout(setupProfileAnalyser,80);
 
@@ -6503,17 +6561,27 @@ setTimeout(setupProfileAnalyser,80);
     if(!name)return;
     const tag=window.prompt('Contexto del perfil','Moodboard / identidad visual')||'Moodboard / identidad visual';
     try{
-      const id='prof_'+Date.now();
-      const profs=typeof getProfs==='function'?getProfs():JSON.parse(localStorage.getItem('np_profs')||'[]');
-      profs.unshift({id,name,tag,flyers:[],created:Date.now(),source:'current-colors'});
-      if(typeof setProfs==='function')setProfs(profs); else localStorage.setItem('np_profs',JSON.stringify(profs));
       const colors=[a,b].filter(Boolean);
-      if(colors.length){
-        const pals=typeof getPals==='function'?getPals():JSON.parse(localStorage.getItem('np_pals')||'[]');
-        pals.unshift({id:'pal_'+Date.now(),name:name+' — Base',colors,note:'Creado desde Color A/B',profId:id});
-        if(typeof setPals==='function')setPals(pals); else localStorage.setItem('np_pals',JSON.stringify(pals));
+      /* v11.2.10: official action path (AppState source of truth) — the direct
+         setProfs() write was clobbered by AppStorage.save() → profile vanished. */
+      if(window.AppActions&&typeof AppActions.createProfile==='function'){
+        const prof=AppActions.createProfile({name,tag,source:'current-colors'});
+        if(prof&&colors.length&&typeof AppActions.savePalette==='function'){
+          AppActions.savePalette({name:name+' — Base',colors,note:'Creado desde Color A/B',profId:prof.id});
+        }
+        try{if(window.activeProfId)localStorage.setItem('np_active_profile',window.activeProfId);}catch(_){}
+      }else{
+        const id='prof_'+Date.now();
+        const profs=typeof getProfs==='function'?getProfs():JSON.parse(localStorage.getItem('np_profs')||'[]');
+        profs.unshift({id,name,tag,flyers:[],created:Date.now(),source:'current-colors'});
+        if(typeof setProfs==='function')setProfs(profs); else localStorage.setItem('np_profs',JSON.stringify(profs));
+        if(colors.length){
+          const pals=typeof getPals==='function'?getPals():JSON.parse(localStorage.getItem('np_pals')||'[]');
+          pals.unshift({id:'pal_'+Date.now(),name:name+' — Base',colors,note:'Creado desde Color A/B',profId:id});
+          if(typeof setPals==='function')setPals(pals); else localStorage.setItem('np_pals',JSON.stringify(pals));
+        }
+        window.activeProfId=id; localStorage.setItem('np_active_profile',id);
       }
-      window.activeProfId=id; localStorage.setItem('np_active_profile',id);
       safeCall('ensureCoreProfiles'); safeCall('renderProfList'); safeCall('renderPalList'); safeCall('updateProfileAvatar'); safeCall('renderActiveProfBar'); safeCall('renderCanvasTest');
       const modal=$('#view-profiles'); if(modal)modal.classList.add('active');
       const st=$('#profile-analysis-status'); if(st)st.textContent='Perfil creado y activado con los colores actuales.';
@@ -8825,15 +8893,12 @@ var CanvasV2UI = (function () {
 
     var xVal   = Math.round(el.x    != null ? el.x    : 50);
     var yVal   = Math.round(el.y    != null ? el.y    : 50);
-    var szVal  = Math.round(el.size != null ? el.size : 14);
     var opVal  = Math.round((el.opacity != null ? el.opacity : 1) * 100);
     var wtVal  = el.weight || 400;
     var align  = el.align  || 'center';
     var ucOn   = el.uppercase !== false;
     var isVis  = el.visible !== false;
-
-    var szMin = isText ? '6'  : (el.shape === 'line' ? '1' : '10');
-    var szMax = isText ? '180': (el.shape === 'line' ? '8' : '80');
+    /* v11.2.11: szVal/szMin/szMax removed with the size −/+ + fine size slider controls */
 
     var parts = [];
 
@@ -8883,10 +8948,7 @@ var CanvasV2UI = (function () {
             '<span class="cv2-label" style="padding-top:6px;">' + CanvasV2State.ui('text') + '</span>',
             '<textarea class="cv2-textarea" id="cv2-text-inp" rows="2">' + textVal + '</textarea>',
           '</div>',
-          /* v11.2.2a: Edit text shortcut button */
-          '<div class="cv2-row" style="justify-content:flex-end;margin-bottom:12px;">',
-            '<button class="cv2-btn-sm" data-cv2-action="edit-text" style="font-size:7.5px;">' + CanvasV2State.ui('editText') + '</button>',
-          '</div>',
+          /* v11.2.11: "Edit text" button removed — double-click the text on the poster instead */
           '<div class="cv2-row cv2-row-controls">',
             '<button class="cv2-tog' + ucClass + '" id="cv2-uppercase">' + CanvasV2State.ui('uppercase') + '</button>',
             '<div class="cv2-align-group">',
@@ -8911,52 +8973,22 @@ var CanvasV2UI = (function () {
     }
 
     /* ── Section D: Position — nudge buttons primary, sliders in advanced panel ── */
-    var isENd = CanvasV2State.getLang() === 'en';
     parts.push(
       '<div class="cv2-sec">',
         '<div class="cv2-sec-title">' + CanvasV2State.ui('sectionPosition') + '</div>',
-        /* Compact readout: X and Y values */
+        /* v11.2.11: nudge arrows, Center H/V and fine X/Y sliders removed —
+           moving is now done by dragging the element on the poster. Keep the
+           live X·Y readout (updated during drag). */
         '<div class="cv2-pos-display" id="cv2-pos-disp">X: ' + xVal + ' &middot; Y: ' + yVal + '</div>',
-        /* Nudge buttons row: ← ↑ ↓ → */
-        '<div class="cv2-nudge-row">',
-          '<button class="cv2-nudge" id="cv2-nudge-left" title="X &minus;2">&larr;</button>',
-          '<button class="cv2-nudge" id="cv2-nudge-up"   title="Y &minus;2">&uarr;</button>',
-          '<button class="cv2-nudge" id="cv2-nudge-down" title="Y +2">&darr;</button>',
-          '<button class="cv2-nudge" id="cv2-nudge-right" title="X +2">&rarr;</button>',
-        '</div>',
-        /* Center shortcuts */
-        '<div class="cv2-row cv2-row-btns">',
-          '<button class="cv2-btn-sm" id="cv2-center-h">' + CanvasV2State.ui('centerH') + '</button>',
-          '<button class="cv2-btn-sm" id="cv2-center-v">' + CanvasV2State.ui('centerV') + '</button>',
-        '</div>',
-        /* Advanced: fine X/Y sliders (collapsible) */
-        '<details class="cv2-advanced">',
-          '<summary>' + (isENd ? 'Fine control' : 'Control fino') + '</summary>',
-          '<div class="cv2-row">',
-            '<span class="cv2-label">' + CanvasV2State.ui('posX') + '</span>',
-            '<input class="cv2-range" id="cv2-x" type="range" min="0" max="100" step="1" value="' + xVal + '">',
-            '<span class="cv2-val" id="cv2-xv">' + xVal + '</span>',
-          '</div>',
-          '<div class="cv2-row">',
-            '<span class="cv2-label">' + CanvasV2State.ui('posY') + '</span>',
-            '<input class="cv2-range" id="cv2-y" type="range" min="0" max="100" step="1" value="' + yVal + '">',
-            '<span class="cv2-val" id="cv2-yv">' + yVal + '</span>',
-          '</div>',
-        '</details>',
       '</div>'
     );
 
-    /* ── Section E: Style — Size ±1 as primary; size slider in advanced panel ── */
-    var isENe = CanvasV2State.getLang() === 'en';
+    /* ── Section E: Style — weight / line width / opacity (size via pinch/handle) ── */
     parts.push(
       '<div class="cv2-sec">',
-        '<div class="cv2-sec-title">' + CanvasV2State.ui('sectionStyle') + '</div>',
-        /* Size −/+ buttons + large display */
-        '<div class="cv2-sz-row">',
-          '<button class="cv2-sz-pm" id="cv2-sz-minus" title="' + CanvasV2State.ui('size') + ' -1">&minus;</button>',
-          '<span class="cv2-sz-display" id="cv2-szv">' + szVal + '</span>',
-          '<button class="cv2-sz-pm" id="cv2-sz-plus"  title="' + CanvasV2State.ui('size') + ' +1">+</button>',
-        '</div>'
+        '<div class="cv2-sec-title">' + CanvasV2State.ui('sectionStyle') + '</div>'
+        /* v11.2.11: size −/+ buttons + fine size slider removed — resize by pinch
+           on mobile or the corner handle on desktop. */
     );
     if (isText) {
       parts.push(
@@ -8983,15 +9015,6 @@ var CanvasV2UI = (function () {
           '<input class="cv2-range" id="cv2-opacity" type="range" min="0" max="100" step="1" value="' + opVal + '">',
           '<span class="cv2-val" id="cv2-opacityv">' + opVal + '%</span>',
         '</div>',
-        /* Advanced: fine size slider (collapsible) */
-        '<details class="cv2-advanced">',
-          '<summary>' + (isENe ? 'Fine size' : 'Tamaño fino') + '</summary>',
-          '<div class="cv2-row">',
-            '<span class="cv2-label">' + CanvasV2State.ui('size') + '</span>',
-            '<input class="cv2-range" id="cv2-sz" type="range" min="' + szMin + '" max="' + szMax + '" step="1" value="' + szVal + '">',
-            '<span class="cv2-val" id="cv2-szv-adv">' + szVal + '</span>',
-          '</div>',
-        '</details>',
       '</div>' /* close section E */
     );
 
@@ -9181,15 +9204,9 @@ var CanvasV2UI = (function () {
     var elements = CanvasV2State.getState().elements;
     var selId    = CanvasV2State.getSelectedId();
 
-    var selEl     = elements[selId];
+    /* v11.2.11: floating selection name label removed — the selected element is
+       already shown by its outline; the label added clutter on the poster. */
     var selLabelHTML = '';
-    if (selEl && selEl.visible !== false) {
-      var lx = selEl.x != null ? selEl.x : 50;
-      var ly = selEl.y != null ? selEl.y : 50;
-      var labelY = Math.max(2, ly - 5);
-      selLabelHTML = '<div class="cv2-sel-label" style="left:' + lx + '%;top:' + labelY + '%;">' +
-        _esc(CanvasV2State.elLabel(selId)) + '</div>';
-    }
 
     var itemsHTML = CanvasV2State.getElementOrder().map(function(id) {
       var el = elements[id];
@@ -9281,30 +9298,15 @@ var CanvasV2UI = (function () {
       if (n) artboard.appendChild(n);
     });
 
-    /* Selection label */
+    /* v11.2.11: floating selection name label removed */
     _reconcileSelLabel(artboard, elements, selId);
     return true;
   }
 
-  function _reconcileSelLabel(artboard, elements, selId) {
-    var node  = artboard.querySelector('.cv2-sel-label');
-    var selEl = elements[selId];
-    if (selEl && selEl.visible !== false) {
-      var lx = selEl.x != null ? selEl.x : 50;
-      var ly = selEl.y != null ? selEl.y : 50;
-      var labelY = Math.max(2, ly - 5);
-      var text = CanvasV2State.elLabel(selId);
-      if (!node) {
-        node = document.createElement('div');
-        node.className = 'cv2-sel-label';
-        artboard.appendChild(node);
-      }
-      node.style.left = lx + '%';
-      node.style.top  = labelY + '%';
-      if (node.textContent !== text) node.textContent = text;
-    } else if (node && node.parentNode) {
-      node.parentNode.removeChild(node);
-    }
+  /* v11.2.11: label removed — this now just clears any stale label node. */
+  function _reconcileSelLabel(artboard) {
+    var node = artboard.querySelector('.cv2-sel-label');
+    if (node && node.parentNode) node.parentNode.removeChild(node);
   }
 
   /* ─────────────────────────────────────────────
@@ -12333,6 +12335,7 @@ var CanvasV2UI = (function () {
   var STORAGE_KEY      = 'colorWheelApp_v1';
   var LANG_KEY         = 'np_lang';
   var LANG_MANUAL_KEY  = 'np_lang_manual';
+  var LANG_AUTODETECT_KEY = 'np_lang_autodetected'; /* v11.2.10: first-run device-language adoption marker */
   var BOUND_MARKER     = 'langV116aBound'; // dataset key on cloned buttons
 
   // Only update these legacy state keys if they already exist in localStorage
@@ -12349,6 +12352,23 @@ var CanvasV2UI = (function () {
 
   function _normalize(lang) {
     return lang === 'en' ? 'en' : 'es';
+  }
+
+  /* v11.2.10: detect the device language among the two supported (es/en).
+     Returns whichever of es/en appears first in the browser's preference list,
+     defaulting to 'es' when neither is present. */
+  function _detectDefaultLang() {
+    try {
+      var list = (navigator.languages && navigator.languages.length)
+        ? navigator.languages
+        : [navigator.language || navigator.userLanguage || 'es'];
+      for (var i = 0; i < list.length; i++) {
+        var c = String(list[i] || '').toLowerCase();
+        if (c.indexOf('es') === 0) return 'es';
+        if (c.indexOf('en') === 0) return 'en';
+      }
+    } catch (e) {}
+    return 'es';
   }
 
   function _get() {
@@ -12439,7 +12459,11 @@ var CanvasV2UI = (function () {
 
       /* ── STEP 2: Write all localStorage keys ── */
       try { localStorage.setItem(LANG_KEY, lang); }        catch(e) {}
-      try { localStorage.setItem(LANG_MANUAL_KEY, '1'); }  catch(e) {}
+      /* v11.2.10: auto-detect passes markManual:false so it doesn't masquerade
+         as a user choice — only real clicks set the manual flag. */
+      if (options.markManual !== false) {
+        try { localStorage.setItem(LANG_MANUAL_KEY, '1'); }  catch(e) {}
+      }
       _syncLegacyStateKeys(lang);
 
       /* ── STEP 3: Set HTML attributes ── */
@@ -12672,6 +12696,22 @@ var CanvasV2UI = (function () {
   ───────────────────────────────────────────────── */
 
   function _boot() {
+    /* v11.2.10: first run → adopt the device language (es/en only).
+       np_lang is always present (the default-state save writes 'es' before we run),
+       so we gate on TWO never-before-set flags instead: the user hasn't manually
+       picked AND we haven't auto-detected yet. Runs exactly once per browser. */
+    try {
+      var manual     = localStorage.getItem(LANG_MANUAL_KEY);
+      var autoDone   = localStorage.getItem(LANG_AUTODETECT_KEY);
+      if (!manual && !autoDone) {
+        try { localStorage.setItem(LANG_AUTODETECT_KEY, '1'); } catch(e) {}
+        var detected = _detectDefaultLang();
+        if (detected !== _get()) {
+          _set(detected, { source: 'auto-detect-first-run', markManual: false });
+        }
+      }
+    } catch (e) {}
+
     var bound = _bindButtons();
 
     // Safety net: re-bind after app:i18n-applied in case any IIFE re-creates buttons
