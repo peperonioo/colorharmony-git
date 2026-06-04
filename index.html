@@ -2410,9 +2410,9 @@ window.AppModules.Gestures = window.AppModules.Gestures || (function(){
 })();
 
 // ═══════════════════════════════════════
-// WHEEL: 20 hues × 8 rings = 160 swatches
+// WHEEL: 20 hues × 9 rings = 180 swatches  (v11.2.16: +anillo casi-blanco; saturaciones subidas)
 // ═══════════════════════════════════════
-const HUES=20, RINGS=8, INNER_R=60, OUTER_R=286, RING_W=(OUTER_R-INNER_R)/RINGS, STEP=360/HUES;
+const HUES=20, RINGS=9, INNER_R=60, OUTER_R=286, RING_W=(OUTER_R-INNER_R)/RINGS, STEP=360/HUES;
 // Naming v1.0: technical-first color labels.
 // The wheel is digital/HSL, so names are based on hue angle plus value/lightness.
 // Popular names are secondary and only used when the hue range really fits.
@@ -2575,8 +2575,10 @@ function updateSlotBox(which,item){
 }
 // Hue anchors use the standard digital hue circle: red 0°, yellow 60°, green 120°, cyan 180°, blue 240°, magenta 300°.
 // The wheel keeps 20 segments, but each swatch is generated from the true anchor hue instead of the segment midpoint.
-const LIGHTNESS=[5,10,18,28,38,50,62,71];
-const SATURATION=[55,68,80,85,87,86,82,76];
+/* v11.2.16: saturaciones más vivas + 9º anillo casi-blanco (l alto, s baja). 9 valores cada uno.
+   Las paletas guardadas no se rompen (guardan HEX, no posición). */
+const LIGHTNESS=[5,10,18,28,38,50,62,71,88];
+const SATURATION=[60,74,88,94,96,94,89,82,20];
 const TONE_LABEL=['Negro profundo','Noir','Muy oscuro','Oscuro','Sombra','Medio','Medio claro','Claro'];
 const NS='http://www.w3.org/2000/svg';
 
@@ -6677,7 +6679,7 @@ setTimeout(setupProfileAnalyser,80);
       const checks={
         version:VERSION,
         wheelSwatches:$all('#swatches .arc-group').length,
-        wheel160:$all('#swatches .arc-group').length===160,
+        wheelSwatchesOk:$all('#swatches .arc-group').length===180, /* v11.2.16: 20×9 */
         smartMatchAPI:!!(window.AppModules&&AppModules.SmartMatchAPI&&typeof AppModules.SmartMatchAPI.score==='function'),
         publicAPI:!!(window.ACPublicAPI||window.AppModules.PublicAPI),
         mobileNav:!!$('.mobile-bottom-nav,.top-nav'),
@@ -8399,6 +8401,10 @@ var CanvasV2State = (function () {
   var UI_LABELS = {
     es: {
       /* sections */
+      sectionAdd:       'Añadir',
+      addText:          '+ Texto',
+      addStar:          '+ Estrella',
+      addLine:          '+ Línea',
       sectionElement:   'Elemento',
       sectionContent:   'Contenido',
       sectionPosition:  'Posición',
@@ -8448,6 +8454,10 @@ var CanvasV2State = (function () {
       restored:         'Estado restaurado'
     },
     en: {
+      sectionAdd:       'Add',
+      addText:          '+ Text',
+      addStar:          '+ Star',
+      addLine:          '+ Line',
       sectionElement:   'Element',
       sectionContent:   'Content',
       sectionPosition:  'Position',
@@ -8776,6 +8786,11 @@ var CanvasV2UI = (function () {
 
       /* ── Actions grid ── */
       '.cv2-actions-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px;}',
+      /* v11.2.17: menú "+ Añadir" */
+      '.cv2-add-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;}',
+      '.cv2-add-btn{color:var(--accent);border-color:color-mix(in srgb,var(--accent) 38%,var(--line));' +
+        'background:color-mix(in srgb,var(--accent) 7%,var(--bg-soft));font-weight:600;}',
+      '.cv2-add-btn:active{background:color-mix(in srgb,var(--accent) 16%,var(--bg-soft));}',
       '.cv2-btn{background:var(--bg-soft);border:1px solid var(--line);border-radius:10px;' +
         'color:var(--ink-dim);font-family:\'JetBrains Mono\',monospace;font-size:8px;' +
         'letter-spacing:.1em;text-transform:uppercase;padding:9px 8px;cursor:pointer;' +
@@ -8956,6 +8971,19 @@ var CanvasV2UI = (function () {
         /* persist-status chip — appended here, managed by persistence.js */
         '<p id="cv2-persist-status" style="display:none;font-family:\'JetBrains Mono\',monospace;' +
           'font-size:9.5px;letter-spacing:.06em;margin:4px 0 0;padding:0;"></p>',
+      '</div>'
+    );
+
+    /* ── Section A: Add (v11.2.17) — crear elementos nuevos de forma intuitiva ── */
+    var canAdd = CanvasV2State.getElementOrder().length < 20;
+    parts.push(
+      '<div class="cv2-sec">',
+        '<div class="cv2-sec-title">' + CanvasV2State.ui('sectionAdd') + '</div>',
+        '<div class="cv2-add-grid">',
+          '<button class="cv2-btn cv2-add-btn" data-cv2-action="add-text"' + (canAdd?'':' disabled') + '>' + CanvasV2State.ui('addText') + '</button>',
+          '<button class="cv2-btn cv2-add-btn" data-cv2-action="add-star"' + (canAdd?'':' disabled') + '>' + CanvasV2State.ui('addStar') + '</button>',
+          '<button class="cv2-btn cv2-add-btn" data-cv2-action="add-line"' + (canAdd?'':' disabled') + '>' + CanvasV2State.ui('addLine') + '</button>',
+        '</div>',
       '</div>'
     );
 
@@ -9509,7 +9537,10 @@ var CanvasV2UI = (function () {
       if (actionBtn) {
         var action = actionBtn.dataset.cv2Action;
 
-        if (action === 'duplicate-selected')  { if (window.CanvasV2) window.CanvasV2.duplicateSelected();        }
+        if (action === 'add-text')            { if (window.CanvasV2) window.CanvasV2.addElement('text');         }
+        else if (action === 'add-star')         { if (window.CanvasV2) window.CanvasV2.addElement('star');         }
+        else if (action === 'add-line')         { if (window.CanvasV2) window.CanvasV2.addElement('line');         }
+        else if (action === 'duplicate-selected')  { if (window.CanvasV2) window.CanvasV2.duplicateSelected();        }
         else if (action === 'delete-selected')  { if (window.CanvasV2) window.CanvasV2.deleteSelected();          }
         else if (action === 'bring-forward')    { if (window.CanvasV2) window.CanvasV2.bringSelectedForward();    }
         else if (action === 'send-backward')    { if (window.CanvasV2) window.CanvasV2.sendSelectedBackward();    }
@@ -10957,6 +10988,42 @@ var CanvasV2UI = (function () {
       /* selectElement renders + saves */
       CanvasV2.selectElement(copyId);
       console.info('[CanvasV2] duplicated', id, '→', copyId);
+    },
+
+    /* ── addElement(kind) — v11.2.17: crear un elemento nuevo (texto/estrella/línea) de forma
+       intuitiva desde el menú "+ Añadir". Genera id único, config por defecto, lo selecciona. ── */
+    addElement: function (kind) {
+      var order = CanvasV2State.getElementOrder();
+      if (order.length >= 20) { console.warn('[CanvasV2] addElement: max 20 elements'); return; }
+      kind = (kind === 'star' || kind === 'line') ? kind : 'text';
+      var prefix = kind === 'text' ? 'text' : kind; /* text / star / line */
+      var id, n;
+      for (n = 1; n <= 30; n++) { id = prefix + 'New' + n; if (!CanvasV2State.getElement(id)) break; }
+      var config;
+      if (kind === 'text') {
+        config = { id:id, type:'text', label:{ es:'Texto nuevo', en:'New text' },
+          text:'TEXTO', x:50, y:50, size:28, align:'center', weight:600, uppercase:true,
+          font:'serif', visible:true, opacity:1 };
+      } else if (kind === 'line') {
+        config = { id:id, type:'shape', shape:'line', label:{ es:'Línea', en:'Line' },
+          x:50, y:50, size:3, width:24, visible:true, opacity:1 };
+      } else {
+        config = { id:id, type:'shape', shape:'star', label:{ es:'Estrella', en:'Star' },
+          x:50, y:50, size:34, visible:true, opacity:1 };
+      }
+      _lastAction = 'addElement:' + kind;
+      try {
+        var ok = CanvasV2State.addElement(id, config);
+        if (!ok) { _lastActionOk = false; return; }
+        CanvasV2State.selectElement(id);
+        CanvasV2.renderControls(id);
+        CanvasV2.renderPreview();
+        _lastControlEvent = Date.now();
+        _save('addElement:' + id);
+        _lastActionOk = true;
+        try { if (window.AppModules && AppModules.Haptics) AppModules.Haptics.tap(); } catch(_){}
+        console.info('[CanvasV2] added', kind, '→', id);
+      } catch (e) { _lastActionOk = false; _lastActionError = String(e); console.warn('[CanvasV2] addElement failed', e); }
     },
 
     /* ── applyTemplate(key) ── */
