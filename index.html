@@ -3582,9 +3582,14 @@ function uniqueById(arr){
   return (arr||[]).filter(item=>{if(!item||!item.id||seen.has(item.id))return false;seen.add(item.id);return true;});
 }
 function getPals(){return uniqueById(safeJSON('np_pals',[]).map(normalisePalette).filter(Boolean));}
-function setPals(a){const data=uniqueById((Array.isArray(a)?a:[]).map(normalisePalette).filter(Boolean)); if(window.AppCore&&AppCore.storage)AppCore.storage.set('np_pals',data); else localStorage.setItem('np_pals',JSON.stringify(data));}
+function setPals(a){const data=uniqueById((Array.isArray(a)?a:[]).map(normalisePalette).filter(Boolean)); if(window.AppCore&&AppCore.storage)AppCore.storage.set('np_pals',data); else localStorage.setItem('np_pals',JSON.stringify(data));
+  /* v11.2.15 Fase 3: mantener AppState en sync para que el siguiente AppStorage.save() NO pise
+     esta escritura legacy (esa era la clase de bug del "doble estado"). */
+  try{ if(window.AppState&&AppState._patch) AppState._patch({profile:{palettes:data}}); }catch(_){ }}
 function getProfs(){return uniqueById(safeJSON('np_profs',[]).map(normaliseProfile).filter(Boolean));}
-function setProfs(a){const data=uniqueById((Array.isArray(a)?a:[]).map(normaliseProfile).filter(Boolean)); if(window.AppCore&&AppCore.storage)AppCore.storage.set('np_profs',data); else localStorage.setItem('np_profs',JSON.stringify(data));}
+function setProfs(a){const data=uniqueById((Array.isArray(a)?a:[]).map(normaliseProfile).filter(Boolean)); if(window.AppCore&&AppCore.storage)AppCore.storage.set('np_profs',data); else localStorage.setItem('np_profs',JSON.stringify(data));
+  /* v11.2.15 Fase 3: idem — sincroniza AppState.profile.profiles */
+  try{ if(window.AppState&&AppState._patch) AppState._patch({profile:{profiles:data}}); }catch(_){ }}
 function ensureCoreProfiles(){
   /* v11.2.7: No longer seeds the personal "Nu Amor" profile or its palettes.
      New visitors start with an empty workspace and create their own profiles.
@@ -3738,6 +3743,8 @@ function activateProfile(profId){
   activeProfId = activeProfId===profId ? null : profId;
   if(activeProfId)localStorage.setItem('np_active_profile',activeProfId);
   else localStorage.removeItem('np_active_profile');
+  /* v11.2.15 Fase 3: sync AppState.profile.activeId para que AppStorage.save() no lo revierta */
+  try{ if(window.AppState&&AppState._patch){window.activeProfId=activeProfId;AppState._patch({profile:{activeId:activeProfId}});} }catch(_){ }
   updateProfileAvatar();
   renderActiveProfBar();
   renderCanvasTest();
@@ -3929,7 +3936,7 @@ function renderProfList(){
     }).join('');
     grid.querySelectorAll('[data-open]').forEach(btn=>btn.addEventListener('click',e=>{e.stopPropagation();openProfDetail(btn.dataset.open);}));
     grid.querySelectorAll('[data-act]').forEach(btn=>btn.addEventListener('click',e=>{e.stopPropagation();activateProfile(btn.dataset.act);}));
-    grid.querySelectorAll('[data-sug]').forEach(btn=>btn.addEventListener('click',e=>{e.stopPropagation();activeProfId=btn.dataset.sug;localStorage.setItem('np_active_profile',activeProfId);updateProfileAvatar();closeProfilesModal();btnC.click();setTimeout(()=>{showSuggestions();renderSugPanel(activeProfId);},100);}));
+    grid.querySelectorAll('[data-sug]').forEach(btn=>btn.addEventListener('click',e=>{e.stopPropagation();activeProfId=btn.dataset.sug;localStorage.setItem('np_active_profile',activeProfId);try{if(window.AppState&&AppState._patch){window.activeProfId=activeProfId;AppState._patch({profile:{activeId:activeProfId}});}}catch(_){}updateProfileAvatar();closeProfilesModal();btnC.click();setTimeout(()=>{showSuggestions();renderSugPanel(activeProfId);},100);}));
     grid.querySelectorAll('[data-del-prof]').forEach(btn=>btn.addEventListener('click',e=>{e.stopPropagation();deleteProfile(btn.dataset.delProf);}));
     updateProfileAvatar();
   }catch(err){
@@ -5670,7 +5677,7 @@ setTimeout(setupProfileAnalyser,80);
       }).join('');
       grid.querySelectorAll('[data-open]').forEach(btn=>btn.addEventListener('click',e=>{e.stopPropagation();openProfDetail(btn.dataset.open);}));
       grid.querySelectorAll('[data-act]').forEach(btn=>btn.addEventListener('click',e=>{e.stopPropagation();activateProfile(btn.dataset.act);}));
-      grid.querySelectorAll('[data-sug]').forEach(btn=>btn.addEventListener('click',e=>{e.stopPropagation();activeProfId=btn.dataset.sug;localStorage.setItem('np_active_profile',activeProfId);updateProfileAvatar();closeProfilesModal();btnC.click();setTimeout(()=>{try{showSuggestions()}catch(_){ } renderSugPanel(activeProfId);},100);}));
+      grid.querySelectorAll('[data-sug]').forEach(btn=>btn.addEventListener('click',e=>{e.stopPropagation();activeProfId=btn.dataset.sug;localStorage.setItem('np_active_profile',activeProfId);try{if(window.AppState&&AppState._patch){window.activeProfId=activeProfId;AppState._patch({profile:{activeId:activeProfId}});}}catch(_){}updateProfileAvatar();closeProfilesModal();btnC.click();setTimeout(()=>{try{showSuggestions()}catch(_){ } renderSugPanel(activeProfId);},100);}));
       grid.querySelectorAll('[data-del-prof]').forEach(btn=>btn.addEventListener('click',e=>{e.stopPropagation();deleteProfile(btn.dataset.delProf);}));
       updateProfileAvatar();
     }catch(err){console.error('[profiles v6.2]',err);const grid=document.getElementById('prof-grid'); if(grid)grid.innerHTML='<div class="empty-st">Profile rendering error.</div>';}
