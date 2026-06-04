@@ -219,10 +219,11 @@ h1 em{font-weight:800;font-style:normal;color:var(--accent);}
 .view{
   display:block;
   opacity:0;
-  transform:translateY(12px) scale(.98);
-  filter:blur(6px);
+  transform:translateY(12px) scale(.985);
+  filter:blur(4px);
   pointer-events:none;
-  transition:opacity .55s var(--ease-yin),transform .55s var(--ease-yin),filter .45s var(--ease-yin);
+  /* v11.2.13: alineado con la transición de panel (.42s) — más ágil y consistente */
+  transition:opacity .44s var(--ease-yin),transform .44s var(--ease-yin),filter .38s var(--ease-yin);
   position:absolute;
   left:24px;right:24px;
   max-width:1452px;
@@ -235,13 +236,18 @@ h1 em{font-weight:800;font-style:normal;color:var(--accent);}
   filter:blur(0);
   pointer-events:auto;
 }
-/* Stagger children — Yin-inspired entrance */
-.view.active > * > *:nth-child(1){animation:yinEnter .7s var(--ease-yin) both;}
-.view.active > * > *:nth-child(2){animation:yinEnter .7s var(--ease-yin) .08s both;}
+/* Stagger children — Yin-inspired entrance (v11.2.13: más ágil, combina con el panel) */
+.view.active > * > *:nth-child(1){animation:yinEnter .52s var(--ease-yin) both;}
+.view.active > * > *:nth-child(2){animation:yinEnter .52s var(--ease-yin) .07s both;}
 @keyframes yinEnter{
   0%{opacity:0;transform:translateY(16px) scale(.97);}
   100%{opacity:1;transform:translateY(0) scale(1);}
 }
+/* v11.2.13: transición al cambiar de panel dentro de la misma vista (Inspo Wheel ↔ Harmonies).
+   El panel que entra hace fade + slide suave (el nav lo deja el usuario como está). */
+@keyframes panelSwap{0%{opacity:0;transform:translateY(10px) scale(.985);filter:blur(3px);}100%{opacity:1;transform:translateY(0) scale(1);filter:blur(0);}}
+#harmony-panel.panel-swap-in,#compare-panel.panel-swap-in{animation:panelSwap .42s var(--ease-yin) both;}
+@media (prefers-reduced-motion: reduce){#harmony-panel.panel-swap-in,#compare-panel.panel-swap-in{animation:none;}}
 .layout{display:grid;grid-template-columns:1fr;gap:40px;align-items:start;}
 @media(min-width:960px){.layout{grid-template-columns:1.3fr 1fr;gap:52px;}}
 .wheel-section{display:flex;justify-content:center;align-items:center;position:relative;min-height:560px;}
@@ -260,15 +266,23 @@ h1 em{font-weight:800;font-style:normal;color:var(--accent);}
 :root[data-theme="light"] .arc-group.selected .arc-path{stroke:rgba(15,20,30,.88);stroke-width:3.2;filter:brightness(1.03) drop-shadow(0 1px 4px rgba(0,0,0,.26));}
 .arc-group.complement .arc-path{stroke:rgba(255,255,255,.9);stroke-width:2;filter:drop-shadow(0 0 5px rgba(255,255,255,.2));}
 .arc-group.analogous .arc-path{stroke:var(--accent);stroke-width:1.8;stroke-dasharray:3 2;filter:drop-shadow(0 0 4px rgba(212,175,55,.18));}
+/* v11.2.12: sugeridos = dorado neutro "respirando" (antes: verde con hormigas en marcha) */
 .arc-group.suggested .arc-path{
-  stroke:var(--ok);
-  stroke-width:2.5;
-  stroke-dasharray:6 4;
+  stroke:var(--accent);
+  stroke-width:2.2;
   stroke-linecap:round;
-  filter:none;
-  animation:sug-march 3.5s linear infinite;
+  filter:drop-shadow(0 0 4px rgba(212,175,55,.5));
+  animation:sug-breathe 2.6s ease-in-out infinite;
 }
+@keyframes sug-breathe{
+  0%,100%{stroke-opacity:.5;stroke-width:1.7;filter:drop-shadow(0 0 3px rgba(212,175,55,.38));}
+  50%    {stroke-opacity:1; stroke-width:2.9;filter:drop-shadow(0 0 9px rgba(212,175,55,.72)) drop-shadow(0 0 16px rgba(212,175,55,.30));}
+}
+/* compat: la clase vieja sug-march ya no se usa, pero dejamos el keyframe por si quedara alguna ref */
 @keyframes sug-march{to{stroke-dashoffset:-200;}}
+@media (prefers-reduced-motion: reduce){
+  .arc-group.suggested .arc-path{animation:none;stroke-opacity:.92;stroke-width:2.2;filter:drop-shadow(0 0 5px rgba(212,175,55,.55));}
+}
 
 .active-prof-bar{display:flex;align-items:center;gap:10px;padding:10px 13px;background:var(--ok-soft);border:1px solid var(--ok-line);border-radius:18px;margin-bottom:12px;font-family:'Fraunces',serif;font-size:14px;letter-spacing:0;text-transform:none;color:var(--ok-ink);box-shadow:0 10px 28px rgba(0,0,0,.10),inset 0 1px 0 rgba(255,255,255,.10);}
 .active-prof-bar .dot{width:7px;height:7px;border-radius:50%;background:var(--ok);flex-shrink:0;animation:pulse 1.8s ease-in-out infinite;}
@@ -375,17 +389,30 @@ h1 em{font-weight:800;font-style:normal;color:var(--accent);}
 .cslot:hover{background:rgba(255,255,255,.04);border-color:rgba(255,255,255,.2);}
 .cslot.sa{border-color:rgba(255,255,255,.2);}
 .cslot.sb{border-color:rgba(212,175,55,.35);}
+/* v11.2.13: el slot activo "respira" (micro-interacción) — blanco para A, dorado para B */
 .cslot.active-slot.sa{
   border-style:solid;border-color:#fff;
   background:rgba(255,255,255,.06);
-  box-shadow:0 0 0 1.5px rgba(255,255,255,.18),0 8px 30px rgba(255,255,255,.08),inset 0 0 20px rgba(255,255,255,.04);
   transform:translateY(-1px);
+  animation:slotBreatheA 2.6s ease-in-out infinite;
 }
 .cslot.active-slot.sb{
   border-style:solid;border-color:var(--accent);
   background:rgba(212,175,55,.08);
-  box-shadow:0 0 0 1.5px rgba(212,175,55,.25),0 8px 30px rgba(212,175,55,.15),inset 0 0 20px rgba(212,175,55,.05);
   transform:translateY(-1px);
+  animation:slotBreatheB 2.6s ease-in-out infinite;
+}
+@keyframes slotBreatheA{
+  0%,100%{box-shadow:0 0 0 1.5px rgba(255,255,255,.14),0 6px 22px rgba(255,255,255,.05),inset 0 0 16px rgba(255,255,255,.03);}
+  50%    {box-shadow:0 0 0 2px   rgba(255,255,255,.32),0 12px 36px rgba(255,255,255,.15),inset 0 0 26px rgba(255,255,255,.08);}
+}
+@keyframes slotBreatheB{
+  0%,100%{box-shadow:0 0 0 1.5px rgba(212,175,55,.20),0 6px 22px rgba(212,175,55,.10),inset 0 0 16px rgba(212,175,55,.04);}
+  50%    {box-shadow:0 0 0 2px   rgba(212,175,55,.42),0 12px 36px rgba(212,175,55,.24),inset 0 0 26px rgba(212,175,55,.10);}
+}
+@media(prefers-reduced-motion:reduce){
+  .cslot.active-slot.sa{animation:none;box-shadow:0 0 0 1.5px rgba(255,255,255,.22),0 8px 30px rgba(255,255,255,.10);}
+  .cslot.active-slot.sb{animation:none;box-shadow:0 0 0 1.5px rgba(212,175,55,.30),0 8px 30px rgba(212,175,55,.16);}
 }
 .cslot.active-slot::after{content:'SELECCIONANDO';position:absolute;top:6px;right:7px;font-family:'JetBrains Mono',monospace;font-size:7px;letter-spacing:.15em;font-weight:600;}
 .cslot.active-slot.sa::after{color:rgba(255,255,255,.7);}
@@ -2769,6 +2796,12 @@ function beginTabTransition(){
     window.__tabChangingTimer=setTimeout(()=>{try{delete document.documentElement.dataset.tabChanging;}catch(_){}},460);
   }catch(_){}
 }
+/* v11.2.13: re-dispara la animación de entrada del panel (Inspo Wheel ↔ Harmonies viven
+   en la misma vista, así que el cambio de display no anima por sí solo). */
+function playPanelSwap(el){
+  if(!el)return;
+  try{ el.classList.remove('panel-swap-in'); void el.offsetWidth; el.classList.add('panel-swap-in'); }catch(_){}
+}
 
 // AppModules.Motion v7.8 — isolated motion layer for navigation.
 // Purpose: liquid nav should not be cancelled by i18n/render/resize refreshes.
@@ -2953,6 +2986,7 @@ btnH.addEventListener('click',()=>{
   beginTabTransition();
   mode='harmony';setNavActive(btnH,true);showView('wheel');
   hPanel.style.display='';cPanel.style.display='none';
+  playPanelSwap(hPanel);
   pLabel.textContent='Muestra Seleccionada';
   wHint.textContent='Toca un color para explorar';
   resetAllArcs({instant:true});
@@ -2964,6 +2998,7 @@ btnC.addEventListener('click',()=>{
   beginTabTransition();
   mode='compare';setNavActive(btnC,true);showView('wheel');
   cPanel.style.display='';hPanel.style.display='none';
+  playPanelSwap(cPanel);
   pLabel.textContent='Rueda Inspo';
   cSlot='a';highlightSlot();
   resetAllArcs({instant:true});
@@ -4758,6 +4793,7 @@ function setupProfileAnalyser(){
     if(slotA&&slotB)renderCompare();else if(slotA&&!slotB)renderColorBAdvisor();
     if(typeof updateSaveBtn==='function')updateSaveBtn();
     renderCanvasTest();
+    if(window.AppModules&&window.AppModules.Haptics)window.AppModules.Haptics.select(); /* v11.2.14 */
     const grid=document.getElementById('predominant-grid');
     if(grid){grid.querySelectorAll('.predominant-pick-btn[data-pick="'+slot+'"]').forEach(b=>b.classList.toggle('is-picked',b.dataset.hex&&b.dataset.hex.toUpperCase()===hex));}
     const st=document.getElementById('profile-analysis-status'); if(st)st.textContent='Color '+slot.toUpperCase()+' = '+hex;
