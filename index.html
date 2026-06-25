@@ -2575,10 +2575,10 @@ function updateSlotBox(which,item){
 }
 // Hue anchors use the standard digital hue circle: red 0°, yellow 60°, green 120°, cyan 180°, blue 240°, magenta 300°.
 // The wheel keeps 20 segments, but each swatch is generated from the true anchor hue instead of the segment midpoint.
-/* v11.2.16: saturaciones más vivas + 9º anillo casi-blanco (l alto, s baja). 9 valores cada uno.
+/* v11.2.18: fuera el anillo casi-blanco (quedaba mal); 9 niveles TODOS vivos para más variedad.
    Las paletas guardadas no se rompen (guardan HEX, no posición). */
-const LIGHTNESS=[5,10,18,28,38,50,62,71,88];
-const SATURATION=[60,74,88,94,96,94,89,82,20];
+const LIGHTNESS=[7,14,22,30,39,48,58,68,78];
+const SATURATION=[62,78,90,95,97,95,91,86,80];
 const TONE_LABEL=['Negro profundo','Noir','Muy oscuro','Oscuro','Sombra','Medio','Medio claro','Claro'];
 const NS='http://www.w3.org/2000/svg';
 
@@ -10231,6 +10231,62 @@ var CanvasV2UI = (function () {
   /* v11.2.9: all currently-down pointers (cleared on pointerup/cancel) */
   var _activePointers = {}; /* pointerId → {x, y} */
 
+  /* ─────────────────────────────────────────────
+     v11.2.18: SMOOTH GESTURE ENGINE
+     Kills the two big jank sources of the old drag/resize/pinch:
+       1) getBoundingClientRect()/getElementById() on EVERY pointermove
+          (layout-thrashing) → cache rect + element refs ONCE at gesture start.
+       2) Writing to AppState + DOM on every event → coalesce DOM writes into a
+          single requestAnimationFrame per frame; defer the authoritative state
+          write to the end of the gesture (pointerup), then renderPreview + save.
+  ───────────────────────────────────────────── */
+  var _gestRect = null, _gestItem = null, _gestCtrl = null;
+  var _frameId = null, _frameFn = null;
+  function _requestFrame(fn) {
+    _frameFn = fn;
+    if (_frameId != null) return;
+    _frameId = requestAnimationFrame(function () {
+      _frameId = null; var f = _frameFn; _frameFn = null;
+      if (f) { try { f(); } catch (_) {} }
+    });
+  }
+  function _cancelFrame() {
+    if (_frameId != null) { try { cancelAnimationFrame(_frameId); } catch (_) {} _frameId = null; }
+    _frameFn = null;
+  }
+  function _cacheGesture(id) {
+    var art = document.getElementById('cv2-artboard');
+    _gestRect = art ? art.getBoundingClientRect() : null;
+    _gestItem = document.getElementById('cv2-item-' + id);
+    _gestCtrl = {
+      posDisp: document.getElementById('cv2-pos-disp'),
+      x:  document.getElementById('cv2-x'),  xv: document.getElementById('cv2-xv'),
+      y:  document.getElementById('cv2-y'),  yv: document.getElementById('cv2-yv'),
+      szv: document.getElementById('cv2-szv'), szvAdv: document.getElementById('cv2-szv-adv'),
+      sz: document.getElementById('cv2-sz')
+    };
+    if (_gestItem) { try { _gestItem.style.willChange = 'left, top, font-size'; } catch (_) {} }
+  }
+  function _clearGesture() {
+    if (_gestItem) { try { _gestItem.style.willChange = ''; } catch (_) {} }
+    _gestRect = null; _gestItem = null; _gestCtrl = null;
+  }
+  function _writePos(newX, newY) {
+    if (_gestItem) { _gestItem.style.left = newX + '%'; _gestItem.style.top = newY + '%'; }
+    var c = _gestCtrl; if (!c) return;
+    var rx = Math.round(newX), ry = Math.round(newY);
+    if (c.posDisp) c.posDisp.textContent = 'X: ' + rx + ' · Y: ' + ry;
+    if (c.x)  c.x.value = rx;  if (c.xv) c.xv.textContent = rx;
+    if (c.y)  c.y.value = ry;  if (c.yv) c.yv.textContent = ry;
+  }
+  function _writeSize(newSize) {
+    if (_gestItem) _gestItem.style.fontSize = newSize + 'px';
+    var c = _gestCtrl; if (!c) return;
+    var rs = Math.round(newSize);
+    if (c.szv) c.szv.textContent = rs; if (c.szvAdv) c.szvAdv.textContent = rs;
+    if (c.sz) c.sz.value = rs;
+  }
+
   /* v11.2.9 / v11.2.9a: pinch-to-resize state (mirrors _drag/_resize pattern) */
   var _pinch = {
     active:    false,
@@ -10411,13 +10467,12 @@ var CanvasV2UI = (function () {
       } catch (_) {}
       var artForCursor = document.getElementById('cv2-artboard');
       if (artForCursor) artForCursor.classList.add('cv2-dragging');
+      _cacheGesture(_drag.id); /* v11.2.18: cache rect + el + controls ONCE */
     }
 
-    /* Coordinate conversion: pixel delta → artboard percentage */
-    var artboard = document.getElementById('cv2-artboard');
-    if (!artboard) return;
-    var rect = artboard.getBoundingClientRect();
-    if (!rect.width || !rect.height) return;
+    /* v11.2.18: use the rect cached at gesture start — no getBoundingClientRect per move */
+    var rect = _gestRect;
+    if (!rect || !rect.width || !rect.height) return;
 
     var rawX = _drag.startElX + (dx / rect.width  * 100);
     var rawY = _drag.startElY + (dy / rect.height * 100);
@@ -10427,37 +10482,13 @@ var CanvasV2UI = (function () {
     var newY = Math.min(100, Math.max(0, isNaN(rawY) ? _drag.startElY : rawY));
 
     _drag.moved            = true;
+    _drag.curX             = newX;
+    _drag.curY             = newY;
     _drag.lastDragDelta    = { dx: Math.round(dx), dy: Math.round(dy) };
     _drag.lastDragPosition = { x: Math.round(newX * 10) / 10, y: Math.round(newY * 10) / 10 };
 
-    /* ── Authoritative state update ── */
-    CanvasV2State.updateElement(_drag.id, { x: newX, y: newY });
-
-    /* ── Lightweight DOM update (avoids full HTML rebuild during drag) ── */
-    var itemEl = document.getElementById('cv2-item-' + _drag.id);
-    if (itemEl) {
-      itemEl.style.left = newX + '%';
-      itemEl.style.top  = newY + '%';
-    }
-
-    /* ── Move selected-element label in sync ── */
-    try {
-      var selLabel = artboard.querySelector('.cv2-sel-label');
-      if (selLabel) {
-        selLabel.style.left = newX + '%';
-        selLabel.style.top  = Math.max(2, newY - 5) + '%';
-      }
-    } catch (_) {}
-
-    /* ── Update controls position readout live ── */
-    try {
-      var posDisp = document.getElementById('cv2-pos-disp');
-      if (posDisp) posDisp.textContent = 'X: ' + Math.round(newX) + ' · Y: ' + Math.round(newY);
-      var xSlider = document.getElementById('cv2-x');  if (xSlider) xSlider.value = Math.round(newX);
-      var xValEl  = document.getElementById('cv2-xv'); if (xValEl)  xValEl.textContent = Math.round(newX);
-      var ySlider = document.getElementById('cv2-y');  if (ySlider) ySlider.value = Math.round(newY);
-      var yValEl  = document.getElementById('cv2-yv'); if (yValEl)  yValEl.textContent = Math.round(newY);
-    } catch (_) {}
+    /* v11.2.18: coalesce DOM writes to one per frame (state is written on pointerup) */
+    _requestFrame(function () { _writePos(_drag.curX, _drag.curY); });
   }
 
   function _onDragPointerUp(e) {
@@ -10496,6 +10527,13 @@ var CanvasV2UI = (function () {
       if (artboard) artboard.classList.remove('cv2-dragging');
     } catch (_) {}
 
+    /* v11.2.18: stop any pending frame + write the authoritative state ONCE here */
+    _cancelFrame();
+    if (_drag.active && _drag.moved && _drag.id && _drag.curX != null) {
+      try { CanvasV2State.updateElement(_drag.id, { x: _drag.curX, y: _drag.curY }); } catch (_) {}
+    }
+    _clearGesture();
+
     /* If a real drag occurred: full re-render + controls sync + force save */
     if (_drag.active && _drag.moved && doSave && _drag.id) {
       try {
@@ -10523,6 +10561,8 @@ var CanvasV2UI = (function () {
     _drag.id        = null;
     _drag.pointerId = null;
     _drag.moved     = false;
+    _drag.curX      = null;
+    _drag.curY      = null;
     _activeMode     = null;
   }
 
@@ -10568,6 +10608,7 @@ var CanvasV2UI = (function () {
     else if (isShape && el.shape === 'line') { _pinch.szMin = 1;  _pinch.szMax = 8;   }
     else                                     { _pinch.szMin = 10; _pinch.szMax = 80;  }
     _activeMode = 'pinch';
+    _cacheGesture(selId); /* v11.2.18: cache rect + el + controls ONCE */
 
     document.addEventListener('pointermove',   _onPinchPointerMove,   false);
     document.addEventListener('pointerup',     _onPinchPointerUp,     false);
@@ -10592,55 +10633,27 @@ var CanvasV2UI = (function () {
     _pinch.moved = true;
     _pinch.lastPinchSize = Math.round(newSize * 10) / 10;
 
-    /* ── v11.2.9a: element follows the centroid of the two fingers ──
-       Translate by the centroid's pixel delta (converted to artboard %),
-       so the element stays "under" your fingers while it scales. */
+    /* ── v11.2.9a: element follows the centroid of the two fingers (scales + moves) ──
+       v11.2.18: use the cached rect (no getBoundingClientRect per move). */
     var newX = _pinch.startElX;
     var newY = _pinch.startElY;
-    var artboard = document.getElementById('cv2-artboard');
     var centroid = _pinchCentroid();
-    if (artboard && centroid) {
-      var rect = artboard.getBoundingClientRect();
-      if (rect.width && rect.height) {
-        var cdx = centroid.x - _pinch.startCx;
-        var cdy = centroid.y - _pinch.startCy;
-        var rawX = _pinch.startElX + (cdx / rect.width  * 100);
-        var rawY = _pinch.startElY + (cdy / rect.height * 100);
-        newX = Math.min(100, Math.max(0, isNaN(rawX) ? _pinch.startElX : rawX));
-        newY = Math.min(100, Math.max(0, isNaN(rawY) ? _pinch.startElY : rawY));
-      }
+    var rect = _gestRect;
+    if (rect && rect.width && rect.height && centroid) {
+      var cdx = centroid.x - _pinch.startCx;
+      var cdy = centroid.y - _pinch.startCy;
+      var rawX = _pinch.startElX + (cdx / rect.width  * 100);
+      var rawY = _pinch.startElY + (cdy / rect.height * 100);
+      newX = Math.min(100, Math.max(0, isNaN(rawX) ? _pinch.startElX : rawX));
+      newY = Math.min(100, Math.max(0, isNaN(rawY) ? _pinch.startElY : rawY));
     }
 
-    CanvasV2State.updateElement(_pinch.id, { size: newSize, x: newX, y: newY });
+    _pinch.curSize = newSize;
+    _pinch.curX = newX;
+    _pinch.curY = newY;
 
-    /* Lightweight DOM update */
-    var itemEl = document.getElementById('cv2-item-' + _pinch.id);
-    if (itemEl) {
-      itemEl.style.fontSize = newSize + 'px';
-      itemEl.style.left = newX + '%';
-      itemEl.style.top  = newY + '%';
-    }
-
-    /* Move selected-element label in sync */
-    try {
-      var selLabel = artboard && artboard.querySelector('.cv2-sel-label');
-      if (selLabel) {
-        selLabel.style.left = newX + '%';
-        selLabel.style.top  = Math.max(2, newY - 5) + '%';
-      }
-    } catch (_) {}
-
-    /* Live controls readout — size + position */
-    try {
-      var szvEl    = document.getElementById('cv2-szv');     if (szvEl)    szvEl.textContent  = Math.round(newSize);
-      var szvAdv   = document.getElementById('cv2-szv-adv'); if (szvAdv)   szvAdv.textContent = Math.round(newSize);
-      var szSlider = document.getElementById('cv2-sz');      if (szSlider) szSlider.value      = Math.round(newSize);
-      var posDisp  = document.getElementById('cv2-pos-disp'); if (posDisp) posDisp.textContent = 'X: ' + Math.round(newX) + ' · Y: ' + Math.round(newY);
-      var xSlider  = document.getElementById('cv2-x');  if (xSlider) xSlider.value = Math.round(newX);
-      var xValEl   = document.getElementById('cv2-xv'); if (xValEl)  xValEl.textContent = Math.round(newX);
-      var ySlider  = document.getElementById('cv2-y');  if (ySlider) ySlider.value = Math.round(newY);
-      var yValEl   = document.getElementById('cv2-yv'); if (yValEl)  yValEl.textContent = Math.round(newY);
-    } catch (_) {}
+    /* v11.2.18: one DOM write per frame; authoritative state written on pointerup */
+    _requestFrame(function () { _writeSize(_pinch.curSize); _writePos(_pinch.curX, _pinch.curY); });
   }
 
   function _onPinchPointerUp(e) {
@@ -10660,6 +10673,13 @@ var CanvasV2UI = (function () {
     window.removeEventListener('blur',            _onPinchWindowBlur,    false);
 
     _activePointers = {}; /* both fingers gone — reset tracking */
+
+    /* v11.2.18: stop pending frame + write authoritative state ONCE */
+    _cancelFrame();
+    if (_pinch.active && _pinch.moved && _pinch.id && _pinch.curSize != null) {
+      try { CanvasV2State.updateElement(_pinch.id, { size: _pinch.curSize, x: _pinch.curX, y: _pinch.curY }); } catch (_) {}
+    }
+    _clearGesture();
 
     if (_pinch.active && _pinch.moved && doSave && _pinch.id) {
       try {
@@ -10684,6 +10704,9 @@ var CanvasV2UI = (function () {
     _pinch.pid1   = null;
     _pinch.pid2   = null;
     _pinch.moved  = false;
+    _pinch.curSize = null;
+    _pinch.curX   = null;
+    _pinch.curY   = null;
     _activeMode   = null;
   }
 
@@ -10777,6 +10800,7 @@ var CanvasV2UI = (function () {
           _resize.pointerCaptureUsed = true;
         }
       } catch (_) {}
+      _cacheGesture(_resize.id); /* v11.2.18 */
     }
 
     /* Size delta: average of horizontal + vertical movement, scaled by sensitivity */
@@ -10787,22 +10811,12 @@ var CanvasV2UI = (function () {
       isNaN(rawSize) ? _resize.startSize : rawSize));
 
     _resize.moved           = true;
+    _resize.curSize         = newSize;
     _resize.lastResizeDelta = { dx: Math.round(dx), dy: Math.round(dy) };
     _resize.lastResizeSize  = Math.round(newSize * 10) / 10;
 
-    /* ── Authoritative state update ── */
-    CanvasV2State.updateElement(_resize.id, { size: newSize });
-
-    /* ── Lightweight DOM update ── */
-    var itemEl = document.getElementById('cv2-item-' + _resize.id);
-    if (itemEl) itemEl.style.fontSize = newSize + 'px';
-
-    /* ── Update size readout in controls live ── */
-    try {
-      var szvEl  = document.getElementById('cv2-szv');    if (szvEl)  szvEl.textContent  = Math.round(newSize);
-      var szvAdv = document.getElementById('cv2-szv-adv'); if (szvAdv) szvAdv.textContent = Math.round(newSize);
-      var szSlider = document.getElementById('cv2-sz'); if (szSlider) szSlider.value = Math.round(newSize);
-    } catch (_) {}
+    /* v11.2.18: one DOM write per frame; authoritative state written on pointerup */
+    _requestFrame(function () { _writeSize(_resize.curSize); });
   }
 
   function _onResizePointerUp(e) {
@@ -10829,6 +10843,13 @@ var CanvasV2UI = (function () {
         prevEl.releasePointerCapture(_resize.pointerId);
       }
     } catch (_) {}
+
+    /* v11.2.18: stop pending frame + write authoritative state ONCE */
+    _cancelFrame();
+    if (_resize.active && _resize.moved && _resize.id && _resize.curSize != null) {
+      try { CanvasV2State.updateElement(_resize.id, { size: _resize.curSize }); } catch (_) {}
+    }
+    _clearGesture();
 
     /* If a real resize occurred: full re-render + controls sync + force save */
     if (_resize.active && _resize.moved && doSave && _resize.id) {
@@ -10857,6 +10878,7 @@ var CanvasV2UI = (function () {
     _resize.id        = null;
     _resize.pointerId = null;
     _resize.moved     = false;
+    _resize.curSize   = null;
     _activeMode       = null;
   }
 
