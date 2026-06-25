@@ -8707,6 +8707,29 @@ var CanvasV2UI = (function () {
       /* ── Preview panel ── */
       '#canvas-v2-preview{order:1;width:100%;display:flex;flex-direction:column;gap:10px;align-items:center;justify-content:flex-start;}',
 
+      /* ── v11.2.19: DESKTOP — lienzo + panel de herramientas flotante (estilo Canva/Photoshop) ── */
+      '@media(min-width:761px){',
+        '#canvas-v2-root{flex-direction:row;align-items:flex-start;justify-content:center;gap:26px;max-width:1180px;padding:28px 26px 40px;}',
+        '#canvas-v2-preview{order:1;flex:1 1 auto;min-width:0;position:sticky;top:24px;}',
+        /* lienzo dimensionado por la altura disponible para que no se corte (premium, sin scroll) */
+        '.cv2-artboard-wrap{width:min(100%,calc((100vh - 300px) * 0.8),520px);margin:0 auto;}',
+        '#canvas-v2-controls{order:2;flex:0 0 330px;width:330px;max-width:330px;margin:0;' +
+          'position:sticky;top:24px;max-height:calc(100vh - 130px);overflow-y:auto;overflow-x:hidden;' +
+          'background:color-mix(in srgb,var(--bg-soft) 78%,transparent);' +
+          'backdrop-filter:blur(26px) saturate(150%);-webkit-backdrop-filter:blur(26px) saturate(150%);' +
+          'border:1px solid rgba(255,255,255,.09);border-radius:20px;padding:6px 16px 20px;' +
+          'box-shadow:0 30px 72px rgba(0,0,0,.46),0 8px 22px rgba(0,0,0,.24),inset 0 1px 0 rgba(255,255,255,.07);}',
+        /* cabecera pegajosa del panel (premium) */
+        '#canvas-v2-controls .cv2-header-row{position:sticky;top:0;z-index:3;margin:0 -16px 4px;padding:14px 16px 12px;' +
+          'background:linear-gradient(to bottom,color-mix(in srgb,var(--bg-soft) 92%,transparent) 70%,transparent);' +
+          'border-bottom:1px solid rgba(255,255,255,.05);}',
+        /* scrollbar fino y discreto */
+        '#canvas-v2-controls::-webkit-scrollbar{width:8px;}',
+        '#canvas-v2-controls::-webkit-scrollbar-thumb{background:rgba(255,255,255,.13);border-radius:8px;}',
+        '#canvas-v2-controls::-webkit-scrollbar-thumb:hover{background:rgba(255,255,255,.22);}',
+        '#canvas-v2-controls::-webkit-scrollbar-track{background:transparent;}',
+      '}',
+
       /* ── Sections ── */
       '.cv2-sec{padding:0;}',
       '.cv2-sec+.cv2-sec{border-top:1px solid rgba(255,255,255,.04);margin-top:14px;padding-top:14px;}',
