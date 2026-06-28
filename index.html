@@ -8405,6 +8405,11 @@ var CanvasV2State = (function () {
       addText:          '+ Texto',
       addStar:          '+ Estrella',
       addLine:          '+ Línea',
+      addText2:         'Texto',
+      addStar2:         'Estrella',
+      addLine2:         'Línea',
+      forward:          'Adelante',
+      backward:         'Atrás',
       sectionElement:   'Elemento',
       sectionContent:   'Contenido',
       sectionPosition:  'Posición',
@@ -8458,6 +8463,11 @@ var CanvasV2State = (function () {
       addText:          '+ Text',
       addStar:          '+ Star',
       addLine:          '+ Line',
+      addText2:         'Text',
+      addStar2:         'Star',
+      addLine2:         'Line',
+      forward:          'Forward',
+      backward:         'Back',
       sectionElement:   'Element',
       sectionContent:   'Content',
       sectionPosition:  'Position',
@@ -8814,6 +8824,21 @@ var CanvasV2UI = (function () {
       '.cv2-add-btn{color:var(--accent);border-color:color-mix(in srgb,var(--accent) 38%,var(--line));' +
         'background:color-mix(in srgb,var(--accent) 7%,var(--bg-soft));font-weight:600;}',
       '.cv2-add-btn:active{background:color-mix(in srgb,var(--accent) 16%,var(--bg-soft));}',
+      /* v11.2.21: Photoshop-style icon tool bar */
+      '.cv2-toolbar{display:flex;flex-wrap:wrap;gap:6px;align-items:stretch;}',
+      '.cv2-tool{flex:1 1 0;min-width:52px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;' +
+        'padding:10px 4px;border:1px solid var(--line);border-radius:12px;background:var(--bg-soft);' +
+        'color:var(--ink-dim);cursor:pointer;touch-action:manipulation;pointer-events:auto;' +
+        'transition:border-color .16s var(--ease-yin),background .16s var(--ease-yin),color .16s var(--ease-yin),transform .12s var(--ease-yin);}',
+      '.cv2-tool svg{width:19px;height:19px;display:block;}',
+      '.cv2-tool-label{font-family:\'JetBrains Mono\',monospace;font-size:7px;letter-spacing:.07em;text-transform:uppercase;line-height:1;}',
+      '.cv2-tool:active{transform:scale(.94);background:rgba(255,255,255,.07);}',
+      '@media(pointer:fine){.cv2-tool:hover{border-color:color-mix(in srgb,var(--accent) 55%,var(--line));color:var(--ink);}}',
+      '.cv2-tool-add{color:var(--accent);border-color:color-mix(in srgb,var(--accent) 32%,var(--line));' +
+        'background:color-mix(in srgb,var(--accent) 6%,var(--bg-soft));}',
+      '.cv2-tool-danger{color:rgba(239,83,80,.9);}',
+      '.cv2-tool:disabled{opacity:.3;cursor:not-allowed;transform:none;}',
+      '.cv2-tool-div{flex-basis:100%;height:1px;background:rgba(255,255,255,.06);margin:3px 0;}',
       '.cv2-btn{background:var(--bg-soft);border:1px solid var(--line);border-radius:10px;' +
         'color:var(--ink-dim);font-family:\'JetBrains Mono\',monospace;font-size:8px;' +
         'letter-spacing:.1em;text-transform:uppercase;padding:9px 8px;cursor:pointer;' +
@@ -8967,6 +8992,23 @@ var CanvasV2UI = (function () {
       .replace(/"/g,'&quot;');
   }
 
+  /* v11.2.21: monochrome SVG icons for the Photoshop-style tool bar (currentColor) */
+  var _CV_ICONS = {
+    text:  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 6h14M12 6v12"/></svg>',
+    star:  '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 3l2.4 5.9 6.4.5-4.9 4.1 1.5 6.2L12 16.9 6.1 19.7l1.5-6.2L2.7 9.4l6.4-.5z"/></svg>',
+    line:  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="4" y1="12" x2="20" y2="12"/></svg>',
+    dup:   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="8.5" y="8.5" width="11" height="11" rx="2"/><path d="M5 15.5V6a2 2 0 0 1 2-2h8.5"/></svg>',
+    fwd:   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M6 11l6-6 6 6"/></svg>',
+    back:  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M6 13l6 6 6-6"/></svg>',
+    eye:   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>',
+    trash: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg>'
+  };
+  function _tool(action, icon, label, cls, disabled) {
+    return '<button type="button" class="cv2-tool' + (cls ? ' ' + cls : '') + '" data-cv2-action="' + action + '"' +
+      (disabled ? ' disabled' : '') + ' title="' + _esc(label) + '" aria-label="' + _esc(label) + '">' +
+      _CV_ICONS[icon] + '<span class="cv2-tool-label">' + _esc(label) + '</span></button>';
+  }
+
   /* ─────────────────────────────────────────────
      BUILD CONTROLS HTML — section-based
   ───────────────────────────────────────────── */
@@ -9000,15 +9042,26 @@ var CanvasV2UI = (function () {
       '</div>'
     );
 
-    /* ── Section A: Add (v11.2.17) — crear elementos nuevos de forma intuitiva ── */
-    var canAdd = CanvasV2State.getElementOrder().length < 20;
+    /* ── v11.2.21: Tool bar (Photoshop-style) — add + element actions as compact icons ── */
+    var tbOrder = CanvasV2State.getElementOrder();
+    var tbCanAdd = tbOrder.length < 20;
+    var tbIdx   = tbOrder.indexOf(selId);
+    var tbCanDel= tbOrder.length > 1;
+    var tbCanFwd= tbIdx < tbOrder.length - 1;
+    var tbCanBwd= tbIdx > 0;
+    var tbIsVis = (function(){ var e = CanvasV2State.getElement(selId); return !e || e.visible !== false; })();
     parts.push(
       '<div class="cv2-sec">',
-        '<div class="cv2-sec-title">' + CanvasV2State.ui('sectionAdd') + '</div>',
-        '<div class="cv2-add-grid">',
-          '<button class="cv2-btn cv2-add-btn" data-cv2-action="add-text"' + (canAdd?'':' disabled') + '>' + CanvasV2State.ui('addText') + '</button>',
-          '<button class="cv2-btn cv2-add-btn" data-cv2-action="add-star"' + (canAdd?'':' disabled') + '>' + CanvasV2State.ui('addStar') + '</button>',
-          '<button class="cv2-btn cv2-add-btn" data-cv2-action="add-line"' + (canAdd?'':' disabled') + '>' + CanvasV2State.ui('addLine') + '</button>',
+        '<div class="cv2-toolbar">',
+          _tool('add-text', 'text', CanvasV2State.ui('addText2'), 'cv2-tool-add', !tbCanAdd),
+          _tool('add-star', 'star', CanvasV2State.ui('addStar2'), 'cv2-tool-add', !tbCanAdd),
+          _tool('add-line', 'line', CanvasV2State.ui('addLine2'), 'cv2-tool-add', !tbCanAdd),
+          '<span class="cv2-tool-div"></span>',
+          _tool('duplicate-selected', 'dup',  CanvasV2State.ui('duplicate'), '', false),
+          _tool('bring-forward',      'fwd',  CanvasV2State.ui('forward'),   '', !tbCanFwd),
+          _tool('send-backward',      'back', CanvasV2State.ui('backward'),  '', !tbCanBwd),
+          _tool('toggle-visibility',  'eye',  tbIsVis ? CanvasV2State.ui('hide') : CanvasV2State.ui('show'), '', false),
+          _tool('delete-selected',    'trash',CanvasV2State.ui('deleteEl'),  'cv2-tool-danger', !tbCanDel),
         '</div>',
       '</div>'
     );
@@ -9130,26 +9183,14 @@ var CanvasV2UI = (function () {
       '</div>'
     );
 
-    /* ── Section F: Actions — v11.2.2a: data-cv2-action dispatch, disabled states ── */
-    var visLabel  = isVis ? CanvasV2State.ui('hide') : CanvasV2State.ui('show');
-    var elOrder   = CanvasV2State.getElementOrder();
-    var elIdx     = elOrder.indexOf(selId);
-    var canDel    = elOrder.length > 1;
-    var canFwd    = elIdx < elOrder.length - 1;
-    var canBwd    = elIdx > 0;
+    /* ── Section F: Reset — v11.2.21: las acciones principales viven en la barra de íconos de arriba.
+       Aquí quedan solo los reset (menos frecuentes / destructivos). ── */
     parts.push(
       '<div class="cv2-sec">',
         '<div class="cv2-sec-title">' + CanvasV2State.ui('sectionActions') + '</div>',
         '<div class="cv2-actions-grid">',
-          '<button class="cv2-btn" data-cv2-action="duplicate-selected">' + CanvasV2State.ui('duplicate') + '</button>',
-          '<button class="cv2-btn cv2-btn-danger" data-cv2-action="delete-selected"' + (canDel ? '' : ' disabled') + '>' + CanvasV2State.ui('deleteEl') + '</button>',
-          '<button class="cv2-btn" data-cv2-action="bring-forward"' + (canFwd ? '' : ' disabled') + '>' + CanvasV2State.ui('layerDown') + '</button>',
-          '<button class="cv2-btn" data-cv2-action="send-backward"' + (canBwd ? '' : ' disabled') + '>' + CanvasV2State.ui('layerUp') + '</button>',
           '<button class="cv2-btn" data-cv2-action="reset-selected">' + CanvasV2State.ui('reset') + '</button>',
-          '<button class="cv2-btn" data-cv2-action="toggle-visibility">' + _esc(visLabel) + '</button>',
-        '</div>',
-        '<div style="margin-top:6px;">',
-          '<button class="cv2-btn cv2-btn-danger cv2-btn-full" data-cv2-action="reset-canvas">' + CanvasV2State.ui('resetCanvas') + '</button>',
+          '<button class="cv2-btn cv2-btn-danger" data-cv2-action="reset-canvas">' + CanvasV2State.ui('resetCanvas') + '</button>',
         '</div>',
       '</div>'
     );
