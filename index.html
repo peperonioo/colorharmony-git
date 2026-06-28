@@ -8872,9 +8872,12 @@ var CanvasV2UI = (function () {
       '@media(max-width:760px){.cv2-resize-handle{display:none!important;}}',
       'html[data-mobile-perf="1"] .cv2-resize-handle{display:none!important;}',
 
-      /* ── v11.2.9: mobile drag + pinch — artboard captures all touch ── */
-      '@media(pointer:coarse){.cv2-artboard{touch-action:none;}}',
-      '@media(pointer:coarse){.cv2-item{touch-action:none!important;}}',
+      /* ── v11.2.20: mobile-first — swipe = scroll de página; solo el elemento SELECCIONADO
+         captura el toque para arrastrarlo (adiós scroll atascado y movimientos accidentales).
+         Pinch (2 dedos) sigue funcionando. ── */
+      '@media(pointer:coarse){.cv2-artboard{touch-action:pan-y;}}',
+      '@media(pointer:coarse){.cv2-item{touch-action:pan-y!important;}}',
+      '@media(pointer:coarse){.cv2-item.is-selected{touch-action:none!important;}}',
 
       /* ── v11.2.3a: controls textarea 16px on mobile (avoid iOS zoom) ── */
       '@media(max-width:760px){.cv2-textarea{font-size:16px;}}',
@@ -10425,6 +10428,12 @@ var CanvasV2UI = (function () {
     var el = CanvasV2State.getElement(cv2Id);
     if (!el || el.visible === false) return;
 
+    /* v11.2.20: mobile-first gate — on touch, only the ALREADY-SELECTED element drags.
+       Tapping an unselected element just selects it; a swipe scrolls the page.
+       (Mouse/desktop is unaffected: any element drags as before.) */
+    var _isTouch = (e.pointerType === 'touch' || e.pointerType === 'pen');
+    _drag.touchNoDrag = _isTouch && (cv2Id !== CanvasV2State.getSelectedId());
+
     /* Record drag start state */
     _drag.active    = false; /* threshold not yet exceeded */
     _drag.id        = cv2Id;
@@ -10477,6 +10486,8 @@ var CanvasV2UI = (function () {
     /* Threshold check — small movements treated as click, not drag */
     if (!_drag.active) {
       if (Math.sqrt(dx * dx + dy * dy) < DRAG_THRESHOLD_PX) return;
+      /* v11.2.20: on touch, don't hijack a swipe over an unselected element — let it scroll */
+      if (_drag.touchNoDrag) return;
       /* Threshold exceeded: enter drag mode */
       _drag.active = true;
       _activeMode  = 'drag';
@@ -10586,6 +10597,7 @@ var CanvasV2UI = (function () {
     _drag.moved     = false;
     _drag.curX      = null;
     _drag.curY      = null;
+    _drag.touchNoDrag = false;
     _activeMode     = null;
   }
 
