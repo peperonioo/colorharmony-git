@@ -8099,6 +8099,56 @@ var CanvasV2State = (function () {
         lineRight: { x:75, y:73, size:3,   width:20, visible:true }
       }
     },
+    /* ── v11.2.27: plantillas con formato + fuentes + extras (círculo/marco) ── */
+    'brand-launch': {
+      name:{ es:'Lanzamiento de Marca', en:'Brand Launch' },
+      format:'square',
+      elements:{
+        title:     { x:50, y:38, size:84, align:'center', weight:700, font:'space',  visible:true },
+        kicker:    { x:50, y:26, size:12, align:'center', font:'mono',  visible:true },
+        copy:      { x:50, y:66, size:14, align:'center', font:'inter', visible:true },
+        cta:       { x:50, y:79, size:10, align:'center', font:'mono',  visible:true },
+        starLeft:  { visible:false }, starRight: { visible:false },
+        lineLeft:  { visible:false }, lineRight: { visible:false }
+      },
+      extras:[
+        { type:'shape', shape:'circle', label:{ es:'Círculo fondo', en:'Bg circle' },
+          x:50, y:47, size:420, opacity:0.12, visible:true, layer:'back' }
+      ]
+    },
+    'framed-invite': {
+      name:{ es:'Invitación Enmarcada', en:'Framed Invite' },
+      format:'post',
+      elements:{
+        title:     { x:50, y:40, size:62, align:'center', weight:400, font:'playfair', visible:true },
+        kicker:    { x:50, y:26, size:17, align:'center', font:'bebas', visible:true },
+        copy:      { x:50, y:58, size:13, align:'center', font:'inter', visible:true },
+        cta:       { x:50, y:71, size:10, align:'center', font:'mono',  visible:true },
+        starLeft:  { x:50, y:79, size:18, visible:true }, starRight: { visible:false },
+        lineLeft:  { visible:false }, lineRight: { visible:false }
+      },
+      extras:[
+        { type:'shape', shape:'frame', label:{ es:'Marco', en:'Frame' },
+          x:50, y:50, size:790, width:86, opacity:0.85, visible:true, layer:'back' }
+      ]
+    },
+    'story-drop': {
+      name:{ es:'Story Anuncio', en:'Story Drop' },
+      format:'story',
+      elements:{
+        title:     { x:50, y:38, size:98, align:'center', weight:400, font:'bebas', visible:true },
+        kicker:    { x:50, y:30, size:13, align:'center', font:'mono',  visible:true },
+        copy:      { x:50, y:58, size:15, align:'center', font:'inter', visible:true },
+        cta:       { x:50, y:68, size:11, align:'center', font:'mono',  visible:true },
+        starLeft:  { x:50, y:12, size:26, visible:true }, starRight: { x:50, y:88, size:26, visible:true },
+        lineLeft:  { x:36, y:63, size:1, width:12, visible:true },
+        lineRight: { x:64, y:63, size:1, width:12, visible:true }
+      },
+      extras:[
+        { type:'shape', shape:'circle', label:{ es:'Círculo acento', en:'Accent circle' },
+          x:50, y:42, size:300, opacity:0.10, visible:true, layer:'back' }
+      ]
+    },
     'soft-brand-card': {
       name:{ es:'Tarjeta de Marca', en:'Soft Brand Card' },
       elements:{
@@ -8200,7 +8250,11 @@ var CanvasV2State = (function () {
     if (patch.text      !== undefined) el.text      = patch.text;
     if (patch.x         !== undefined) el.x         = Math.max(0, Math.min(100, +patch.x || 0));
     if (patch.y         !== undefined) el.y         = Math.max(0, Math.min(100, +patch.y || 0));
-    if (patch.size      !== undefined) el.size      = Math.max(1, Math.min(240, +patch.size || 1));
+    if (patch.size !== undefined) {
+      /* v11.2.27: círculo/marco pueden ser grandes (fondos, bordes de póster) */
+      var maxSz = (el.shape === 'circle' || el.shape === 'frame') ? 900 : 240;
+      el.size = Math.max(1, Math.min(maxSz, +patch.size || 1));
+    }
     if (patch.width     !== undefined) el.width     = Math.max(2, Math.min(80, +patch.width || 2));
     if (patch.visible   !== undefined) el.visible   = !!patch.visible;
     if (patch.opacity   !== undefined) el.opacity   = Math.max(0, Math.min(1, +patch.opacity));
@@ -8254,10 +8308,36 @@ var CanvasV2State = (function () {
   function applyTemplate(key) {
     var tmpl = TEMPLATES[key];
     if (!tmpl) return false;
+
+    /* v11.2.27: quitar los extras de una plantilla anterior (idempotente) */
+    var order = _state.elementOrder;
+    for (var ti = order.length - 1; ti >= 0; ti--) {
+      if (order[ti].indexOf('tmplExtra') === 0) _removeElement(order[ti]);
+    }
+
     var patches = tmpl.elements;
     Object.keys(patches).forEach(function(id) {
       if (_state.elements[id]) updateElement(id, patches[id]);
     });
+
+    /* v11.2.27: la plantilla puede fijar el formato del lienzo */
+    if (tmpl.format) setFormat(tmpl.format);
+
+    /* v11.2.27: extras dinámicos (círculos/marcos decorativos);
+       layer:'back' los manda al fondo (detrás del texto). */
+    if (tmpl.extras && tmpl.extras.length) {
+      tmpl.extras.forEach(function (ex, xi) {
+        var exId = 'tmplExtra' + (xi + 1);
+        var cfg = _deepCopy(ex);
+        var toBack = cfg.layer === 'back';
+        delete cfg.layer;
+        if (addElement(exId, cfg) && toBack) {
+          var oi = _state.elementOrder.indexOf(exId);
+          if (oi > 0) { _state.elementOrder.splice(oi, 1); _state.elementOrder.unshift(exId); }
+        }
+      });
+    }
+
     _state.currentTemplate = key;
     return true;
   }
@@ -11111,7 +11191,7 @@ var CanvasV2UI = (function () {
     if (isText)                              { _pinch.szMin = 6;  _pinch.szMax = 180; }
     else if (isShape && el.shape === 'line') { _pinch.szMin = 1;  _pinch.szMax = 8;   }
     else if (isShape && (el.shape === 'circle' || el.shape === 'frame'))
-                                             { _pinch.szMin = 10; _pinch.szMax = 240; } /* v11.2.26 */
+                                             { _pinch.szMin = 10; _pinch.szMax = 900; } /* v11.2.26/27 */
     else                                     { _pinch.szMin = 10; _pinch.szMax = 80;  }
     _activeMode = 'pinch';
     _cacheGesture(selId); /* v11.2.18: cache rect + el + controls ONCE */
@@ -11262,7 +11342,7 @@ var CanvasV2UI = (function () {
     var szMin, szMax;
     if (isText)             { szMin = 6;  szMax = 180; }
     else if (isShape && el.shape === 'line') { szMin = 1; szMax = 8; }
-    else if (isShape && (el.shape === 'circle' || el.shape === 'frame')) { szMin = 10; szMax = 240; } /* v11.2.26 */
+    else if (isShape && (el.shape === 'circle' || el.shape === 'frame')) { szMin = 10; szMax = 900; } /* v11.2.26/27 */
     else                    { szMin = 10; szMax = 80;  }
 
     _resize.active    = false;
@@ -11592,6 +11672,11 @@ var CanvasV2UI = (function () {
       var ok = CanvasV2State.applyTemplate(key);
       if (!ok) { console.warn('[CanvasV2] applyTemplate: unknown key', key); return; }
       var selId = CanvasV2State.getSelectedId();
+      /* v11.2.27: si lo seleccionado era un extra que la plantilla quitó → title */
+      if (selId && !CanvasV2State.getElement(selId)) {
+        CanvasV2State.selectElement('title');
+        selId = 'title';
+      }
       CanvasV2.renderControls(selId);
       CanvasV2.renderPreview();
       _lastControlEvent = Date.now();
