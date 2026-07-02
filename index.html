@@ -8126,8 +8126,28 @@ var CanvasV2State = (function () {
     selectedElementId: 'title',
     elements:          _deepCopy(_defaults),
     elementOrder:      DEFAULT_ELEMENT_IDS.slice(),
-    currentTemplate:   null
+    currentTemplate:   null,
+    canvasFormat:      'post'   /* v11.2.24: post 4:5 | square 1:1 | story 9:16 */
   };
+
+  /* ─────────────────────────────────────────────
+     v11.2.24 — FORMATOS DE LIENZO + TAMAÑOS RELATIVOS
+     Los `size` guardados se interpretan como "px en un artboard de
+     referencia de 720 de ancho" (el ancho máximo histórico) y se
+     renderizan en `cqw` → el póster se ve IGUAL en cualquier pantalla
+     y el export es determinista. Sin migración de datos.
+  ───────────────────────────────────────────── */
+  var BASE_WIDTH = 720; /* ancho de referencia del artboard */
+  var FORMATS = {
+    post:   { css: '4 / 5',  w: 1080, h: 1350 },
+    square: { css: '1 / 1',  w: 1080, h: 1080 },
+    story:  { css: '9 / 16', w: 1080, h: 1920 }
+  };
+  function getFormat()      { return FORMATS[_state.canvasFormat] ? _state.canvasFormat : 'post'; }
+  function setFormat(key)   { if (FORMATS[key]) _state.canvasFormat = key; }
+  function formatSpec(key)  { return FORMATS[key || getFormat()] || FORMATS.post; }
+  /* size (px@720) → unidad CSS relativa al ancho del artboard */
+  function sizeToCss(size)  { return (Math.round((size / (BASE_WIDTH / 100)) * 1000) / 1000) + 'cqw'; }
 
   /* ─────────────────────────────────────────────
      ACCESSORS
@@ -8227,6 +8247,7 @@ var CanvasV2State = (function () {
 
   /* resetCanvas: restore all default elements, remove dynamic elements */
   function resetCanvas() {
+    _state.canvasFormat = 'post'; /* v11.2.24 */
     DEFAULT_ELEMENT_IDS.forEach(function(id) {
       _state.elements[id] = _deepCopy(_defaults[id]);
     });
@@ -8418,6 +8439,10 @@ var CanvasV2State = (function () {
       sectionStyle:     'Estilo',
       sectionActions:   'Acciones',
       sectionTemplate:  'Plantilla',
+      sectionFormat:    'Formato',
+      fmtPost:          'Post 4:5',
+      fmtSquare:        'Cuadrado',
+      fmtStory:         'Story',
       /* element */
       element:          'Elemento',
       tapToSelect:      'Toca un elemento en la vista previa para seleccionarlo.',
@@ -8485,6 +8510,10 @@ var CanvasV2State = (function () {
       sectionStyle:     'Style',
       sectionActions:   'Actions',
       sectionTemplate:  'Template',
+      sectionFormat:    'Format',
+      fmtPost:          'Post 4:5',
+      fmtSquare:        'Square',
+      fmtStory:         'Story',
       element:          'Element',
       tapToSelect:      'Tap an element in the preview to select it.',
       text:             'Text',
@@ -8568,6 +8597,12 @@ var CanvasV2State = (function () {
     isTextElement:       isTextElement,
     isShapeElement:      isShapeElement,
     isDefaultElement:    isDefaultElement,
+
+    /* v11.2.24: formatos + tamaños relativos */
+    getFormat:           getFormat,
+    setFormat:           setFormat,
+    formatSpec:          formatSpec,
+    sizeToCss:           sizeToCss,
 
     /* Mutations */
     selectElement:       selectElement,
@@ -8905,14 +8940,38 @@ var CanvasV2UI = (function () {
         '50%{box-shadow:0 12px 30px color-mix(in srgb,var(--accent) 44%,transparent);}}',
       '@media(prefers-reduced-motion: reduce){.cv2-export-primary{animation:none;}}',
 
-      /* ── Artboard wrapper — v11.2.2: stronger shadow + subtle border frame ── */
+      /* ── Artboard wrapper — v11.2.2: stronger shadow + subtle border frame ──
+         v11.2.24: container-type:inline-size → los tamaños de los elementos van
+         en cqw (relativos al ancho del artboard, referencia 720). */
       '.cv2-artboard-wrap{position:relative;width:min(calc(100vw - 48px),720px);max-width:720px;margin:0 auto;' +
+        'container-type:inline-size;' +
         'border-radius:20px;overflow:hidden;border:1px solid rgba(255,255,255,.07);' +
         'box-shadow:0 24px 70px rgba(0,0,0,.44),0 6px 20px rgba(0,0,0,.22),inset 0 1px 0 rgba(255,255,255,.07);}',
 
-      /* ── Artboard — 4:5 poster ── */
+      /* ── Artboard — formatos (v11.2.24): post 4:5 / cuadrado 1:1 / story 9:16 ── */
       '.cv2-artboard{position:relative;width:100%;aspect-ratio:4/5;overflow:hidden;' +
         'border-radius:20px;user-select:none;}',
+      '.cv2-fmt-square .cv2-artboard{aspect-ratio:1/1;}',
+      '.cv2-fmt-story  .cv2-artboard{aspect-ratio:9/16;}',
+      /* story/cuadrado: cap de alto para que quepan en el viewport */
+      '.cv2-artboard-wrap.cv2-fmt-square{width:min(calc(100vw - 48px),720px,78vh);}',
+      '.cv2-artboard-wrap.cv2-fmt-story{width:min(calc(100vw - 48px),720px,calc(78vh * 9 / 16));}',
+
+      /* ── v11.2.24: picker de formato (segmentado) ── */
+      '.cv2-fmt-group{display:flex;gap:6px;}',
+      '.cv2-fmt-btn{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;' +
+        'padding:9px 4px;border:1px solid var(--line);border-radius:12px;background:var(--bg-soft);' +
+        'color:var(--ink-dim);cursor:pointer;touch-action:manipulation;pointer-events:auto;' +
+        'font-family:\'JetBrains Mono\',monospace;font-size:7px;letter-spacing:.08em;text-transform:uppercase;' +
+        'transition:border-color .16s var(--ease-yin),color .16s var(--ease-yin);}',
+      '.cv2-fmt-icon{display:block;width:14px;border:1.5px solid currentColor;border-radius:3px;}',
+      '.cv2-fmt-btn[data-cv2-format="post"] .cv2-fmt-icon{height:17px;}',
+      '.cv2-fmt-btn[data-cv2-format="square"] .cv2-fmt-icon{height:14px;}',
+      '.cv2-fmt-btn[data-cv2-format="story"] .cv2-fmt-icon{width:11px;height:19px;}',
+      '.cv2-fmt-btn:active{transform:scale(.96);}',
+      '.cv2-fmt-on{color:var(--accent);border-color:color-mix(in srgb,var(--accent) 55%,var(--line));' +
+        'background:color-mix(in srgb,var(--accent) 8%,var(--bg-soft));}',
+      '@media(pointer:fine){.cv2-fmt-btn:not(.cv2-fmt-on):hover{border-color:color-mix(in srgb,var(--accent) 40%,var(--line));color:var(--ink);}}',
 
       /* ── Artboard items ── */
       '.cv2-item{position:absolute;line-height:1;pointer-events:auto;cursor:pointer;' +
@@ -9145,6 +9204,24 @@ var CanvasV2UI = (function () {
           _tool('send-backward',      'back', CanvasV2State.ui('backward'),  '', !tbCanBwd),
           _tool('toggle-visibility',  'eye',  tbIsVis ? CanvasV2State.ui('hide') : CanvasV2State.ui('show'), '', !hasSel),
           _tool('delete-selected',    'trash',CanvasV2State.ui('deleteEl'),  'cv2-tool-danger', !tbCanDel),
+        '</div>',
+      '</div>'
+    );
+
+    /* ── v11.2.24: Formato del lienzo (post / cuadrado / story) ── */
+    var curFmt = CanvasV2State.getFormat();
+    function _fmtBtn(key, label) {
+      return '<button type="button" class="cv2-fmt-btn' + (curFmt === key ? ' cv2-fmt-on' : '') + '" ' +
+        'data-cv2-action="set-format" data-cv2-format="' + key + '">' +
+        '<span class="cv2-fmt-icon"></span>' + _esc(label) + '</button>';
+    }
+    parts.push(
+      '<div class="cv2-sec">',
+        '<div class="cv2-sec-title">' + CanvasV2State.ui('sectionFormat') + '</div>',
+        '<div class="cv2-fmt-group">',
+          _fmtBtn('post',   CanvasV2State.ui('fmtPost')),
+          _fmtBtn('square', CanvasV2State.ui('fmtSquare')),
+          _fmtBtn('story',  CanvasV2State.ui('fmtStory')),
         '</div>',
       '</div>'
     );
@@ -9410,7 +9487,9 @@ var CanvasV2UI = (function () {
       'left:' + el.x + '%',
       'top:'  + el.y + '%',
       'color:' + colors.b,
-      'font-size:' + el.size + 'px'
+      /* v11.2.24: tamaño relativo al ancho del artboard (px@720 → cqw) —
+         el póster se ve igual en cualquier pantalla */
+      'font-size:' + CanvasV2State.sizeToCss(el.size)
     ];
     if (opacity < 1) styleProps.push('opacity:' + opacity);
 
@@ -9440,7 +9519,7 @@ var CanvasV2UI = (function () {
     } else if (el.type === 'shape' && el.shape === 'line') {
       classes.push('cv2-shape-line');
       styleProps.push('width:'  + (el.width || 16) + '%');
-      styleProps.push('height:' + el.size + 'px');
+      styleProps.push('height:' + CanvasV2State.sizeToCss(el.size));
       styleProps.push('background:' + colors.b);
       styleProps.push('opacity:' + (opacity * 0.72));
       inner = handle;
@@ -9499,7 +9578,7 @@ var CanvasV2UI = (function () {
       '<div class="cv2-chip-row">' +
         '<span class="cv2-chip" id="cv2-prof-chip">' + _esc(profileChip) + '</span>' +
       '</div>' +
-      '<div class="cv2-artboard-wrap">' +
+      '<div class="cv2-artboard-wrap cv2-fmt-' + CanvasV2State.getFormat() + '">' +
         '<div class="cv2-artboard" id="cv2-artboard" style="background:' + colors.a + ';">' +
           itemsHTML +
           selLabelHTML +
@@ -9522,6 +9601,12 @@ var CanvasV2UI = (function () {
     var chip = document.getElementById('cv2-prof-chip');
     if (chip && chip.textContent !== profileChip) chip.textContent = profileChip;
     if (artboard.style.background !== colors.a) artboard.style.background = colors.a;
+    /* v11.2.24: la clase de formato del wrap sigue al estado */
+    var wrapEl = artboard.parentElement;
+    if (wrapEl && wrapEl.classList.contains('cv2-artboard-wrap')) {
+      var fmtCls = 'cv2-artboard-wrap cv2-fmt-' + CanvasV2State.getFormat();
+      if (wrapEl.className !== fmtCls) wrapEl.className = fmtCls;
+    }
     var hintEl = document.querySelector('#canvas-v2-preview .cv2-preview-hint');
     if (hintEl) {
       var lang = CanvasV2State.getLang();
@@ -9792,6 +9877,9 @@ var CanvasV2UI = (function () {
         else if (action === 'reset-selected')   { if (window.CanvasV2) window.CanvasV2.resetSelected();           }
         else if (action === 'toggle-visibility') { if (window.CanvasV2) window.CanvasV2.toggleSelectedVisibility(); }
         else if (action === 'toggle-more')      { toggleMore(); return; }
+        else if (action === 'set-format') {
+          if (window.CanvasV2 && window.CanvasV2.setFormat) window.CanvasV2.setFormat(actionBtn.dataset.cv2Format);
+        }
         else if (action === 'reset-canvas') {
           if (window.confirm(CanvasV2State.ui('resetConfirm'))) {
             if (window.CanvasV2) window.CanvasV2.resetCanvas();
@@ -10530,7 +10618,8 @@ var CanvasV2UI = (function () {
     if (c.y)  c.y.value = ry;  if (c.yv) c.yv.textContent = ry;
   }
   function _writeSize(newSize) {
-    if (_gestItem) _gestItem.style.fontSize = newSize + 'px';
+    /* v11.2.24: los tamaños van en cqw (relativos al artboard) */
+    if (_gestItem) _gestItem.style.fontSize = CanvasV2State.sizeToCss(newSize);
     var c = _gestCtrl; if (!c) return;
     var rs = Math.round(newSize);
     if (c.szv) c.szv.textContent = rs; if (c.szvAdv) c.szvAdv.textContent = rs;
@@ -11384,6 +11473,16 @@ var CanvasV2UI = (function () {
       } catch (e) { _lastActionOk = false; _lastActionError = String(e); console.warn('[CanvasV2] addElement failed', e); }
     },
 
+    /* ── setFormat(key) — v11.2.24: post / square / story ── */
+    setFormat: function (key) {
+      CanvasV2State.setFormat(key);
+      CanvasV2.renderControls(CanvasV2State.getSelectedId()); /* refresca el segmentado */
+      CanvasV2.renderPreview('setFormat'); /* reconcile actualiza la clase del wrap */
+      _lastControlEvent = Date.now();
+      _save('setFormat:' + key);
+      console.info('[CanvasV2] formato del lienzo:', CanvasV2State.getFormat());
+    },
+
     /* ── applyTemplate(key) ── */
     applyTemplate: function (key) {
       var ok = CanvasV2State.applyTemplate(key);
@@ -11985,9 +12084,10 @@ var CanvasV2UI = (function () {
    Ventaja: sale limpio (sin outline de selección ni handles) y a
    cualquier resolución.
 
-   Escala: WYSIWYG — usa el ancho real del artboard en pantalla como
-   referencia (el.size está en px de pantalla). Sin artboard montado,
-   referencia = 720 (el ancho máximo del artboard).
+   Escala (v11.2.24): determinista — el.size son "px@720" (referencia
+   de 720 de ancho, igual que el render cqw del DOM), así que
+   scale = anchoExport / 720 y la imagen sale IGUAL en cualquier
+   dispositivo. Dimensiones según el formato (post/cuadrado/story).
 
    API:
      CanvasV2Export.renderToCanvas(opts?) → Promise<HTMLCanvasElement>
@@ -12005,13 +12105,6 @@ var CanvasV2Export = (function () {
   var BASE_ARTBOARD_WIDTH = 720;    /* fallback si el artboard no está montado */
 
   /* ── helpers de estado/geometría ── */
-
-  function _artboardRect() {
-    var art = document.getElementById('cv2-artboard');
-    if (!art) return null;
-    var r = art.getBoundingClientRect();
-    return (r.width > 0 && r.height > 0) ? r : null;
-  }
 
   function _fontStack(el) {
     return el.font === 'mono' ? "'JetBrains Mono', monospace" : "'Fraunces', serif";
@@ -12120,13 +12213,14 @@ var CanvasV2Export = (function () {
 
   function renderToCanvas(opts) {
     opts = opts || {};
-    var W = opts.width || EXPORT_WIDTH;
-
-    var rect = _artboardRect();
-    var refWidth = rect ? rect.width : BASE_ARTBOARD_WIDTH;
-    var aspect = rect ? (rect.height / rect.width) : 1.25; /* 4:5 por defecto */
-    var H = Math.round(W * aspect);
-    var scale = W / refWidth;
+    /* v11.2.24: dimensiones según el formato del lienzo (post/cuadrado/story)
+       y escala DETERMINISTA: el.size = px@720 → misma imagen en cualquier
+       dispositivo (ya no depende del ancho del artboard en pantalla). */
+    var spec = (CanvasV2State.formatSpec) ? CanvasV2State.formatSpec()
+                                          : { w: EXPORT_WIDTH, h: 1350 };
+    var W = opts.width || spec.w;
+    var H = opts.height || Math.round(W * spec.h / spec.w);
+    var scale = W / BASE_ARTBOARD_WIDTH;
 
     var colors = CanvasV2State.getColors();
     var order = CanvasV2State.getElementOrder();
@@ -12331,6 +12425,7 @@ var CanvasV2Export = (function () {
       selectedElementId: CanvasV2State.getSelectedId(),
       elementOrder:      order.slice(),
       currentTemplate:   CanvasV2State.getCurrentTemplate(),
+      canvasFormat:      CanvasV2State.getFormat ? CanvasV2State.getFormat() : 'post', /* v11.2.24 */
       elements:          elSnaps
     };
   }
@@ -12380,6 +12475,11 @@ var CanvasV2Export = (function () {
       /* Restore template state (no re-apply, positions already restored above) */
       if (snap.currentTemplate && typeof snap.currentTemplate === 'string') {
         CanvasV2State.getState().currentTemplate = snap.currentTemplate;
+      }
+
+      /* v11.2.24: restore canvas format (snapshots viejos → 'post' por defecto) */
+      if (snap.canvasFormat && CanvasV2State.setFormat) {
+        CanvasV2State.setFormat(snap.canvasFormat);
       }
 
       /* Restore selectedElementId */
