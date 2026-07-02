@@ -8448,6 +8448,8 @@ var CanvasV2State = (function () {
       addText2:         'Texto',
       addStar2:         'Estrella',
       addLine2:         'Línea',
+      addCircle2:       'Círculo',
+      addFrame2:        'Marco',
       forward:          'Adelante',
       backward:         'Atrás',
       sectionElement:   'Elemento',
@@ -8520,6 +8522,8 @@ var CanvasV2State = (function () {
       addText2:         'Text',
       addStar2:         'Star',
       addLine2:         'Line',
+      addCircle2:       'Circle',
+      addFrame2:        'Frame',
       forward:          'Forward',
       backward:         'Back',
       sectionElement:   'Element',
@@ -9021,6 +9025,10 @@ var CanvasV2UI = (function () {
       '.cv2-item.cv2-shape-star{font-style:normal;transform:translateX(-50%) translateY(-50%);}',
       '.cv2-item.cv2-align-center.cv2-shape-star{transform:translateX(-50%) translateY(-50%);}',
       '.cv2-item.cv2-shape-line{border-radius:999px;transform:translateX(-50%) translateY(-50%);}',
+      /* v11.2.26: círculo + marco */
+      '.cv2-item.cv2-shape-circle{border-radius:50%;transform:translateX(-50%) translateY(-50%);}',
+      '.cv2-item.cv2-shape-frame{transform:translateX(-50%) translateY(-50%);border-radius:2px;' +
+        'background:transparent;box-sizing:border-box;}',
 
       /* ── Disabled button state — v11.2.2a ── */
       '.cv2-btn:disabled,.cv2-btn-sm:disabled{opacity:.32;cursor:not-allowed;}',
@@ -9146,6 +9154,8 @@ var CanvasV2UI = (function () {
     text:  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 6h14M12 6v12"/></svg>',
     star:  '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 3l2.4 5.9 6.4.5-4.9 4.1 1.5 6.2L12 16.9 6.1 19.7l1.5-6.2L2.7 9.4l6.4-.5z"/></svg>',
     line:  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="4" y1="12" x2="20" y2="12"/></svg>',
+    circle:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="8"/></svg>',
+    frame: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="6" width="16" height="12" rx="1.5"/></svg>',
     dup:   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="8.5" y="8.5" width="11" height="11" rx="2"/><path d="M5 15.5V6a2 2 0 0 1 2-2h8.5"/></svg>',
     fwd:   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M6 11l6-6 6 6"/></svg>',
     back:  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M6 13l6 6 6-6"/></svg>',
@@ -9232,6 +9242,8 @@ var CanvasV2UI = (function () {
           _tool('add-text', 'text', CanvasV2State.ui('addText2'), 'cv2-tool-add', !tbCanAdd),
           _tool('add-star', 'star', CanvasV2State.ui('addStar2'), 'cv2-tool-add', !tbCanAdd),
           _tool('add-line', 'line', CanvasV2State.ui('addLine2'), 'cv2-tool-add', !tbCanAdd),
+          _tool('add-circle', 'circle', CanvasV2State.ui('addCircle2'), 'cv2-tool-add', !tbCanAdd),
+          _tool('add-frame',  'frame',  CanvasV2State.ui('addFrame2'),  'cv2-tool-add', !tbCanAdd),
           '<span class="cv2-tool-div"></span>',
           _tool('duplicate-selected', 'dup',  CanvasV2State.ui('duplicate'), '', !hasSel),
           _tool('bring-forward',      'fwd',  CanvasV2State.ui('forward'),   '', !tbCanFwd),
@@ -9574,6 +9586,22 @@ var CanvasV2UI = (function () {
       styleProps.push('height:' + CanvasV2State.sizeToCss(el.size));
       styleProps.push('background:' + colors.b);
       styleProps.push('opacity:' + (opacity * 0.72));
+      inner = handle;
+
+    } else if (el.type === 'shape' && el.shape === 'circle') {
+      /* v11.2.26: círculo relleno — size = diámetro (px@720) */
+      classes.push('cv2-shape-circle');
+      styleProps.push('width:'  + CanvasV2State.sizeToCss(el.size));
+      styleProps.push('height:' + CanvasV2State.sizeToCss(el.size));
+      styleProps.push('background:' + colors.b);
+      inner = handle;
+
+    } else if (el.type === 'shape' && el.shape === 'frame') {
+      /* v11.2.26: marco rectangular — width% × size de alto, borde 2@720 */
+      classes.push('cv2-shape-frame');
+      styleProps.push('width:'  + (el.width || 40) + '%');
+      styleProps.push('height:' + CanvasV2State.sizeToCss(el.size));
+      styleProps.push('border:' + CanvasV2State.sizeToCss(2) + ' solid ' + colors.b);
       inner = handle;
 
     } else {
@@ -9922,6 +9950,8 @@ var CanvasV2UI = (function () {
         if (action === 'add-text')            { if (window.CanvasV2) window.CanvasV2.addElement('text');         }
         else if (action === 'add-star')         { if (window.CanvasV2) window.CanvasV2.addElement('star');         }
         else if (action === 'add-line')         { if (window.CanvasV2) window.CanvasV2.addElement('line');         }
+        else if (action === 'add-circle')       { if (window.CanvasV2) window.CanvasV2.addElement('circle');       }
+        else if (action === 'add-frame')        { if (window.CanvasV2) window.CanvasV2.addElement('frame');        }
         else if (action === 'duplicate-selected')  { if (window.CanvasV2) window.CanvasV2.duplicateSelected();        }
         else if (action === 'delete-selected')  { if (window.CanvasV2) window.CanvasV2.deleteSelected();          }
         else if (action === 'bring-forward')    { if (window.CanvasV2) window.CanvasV2.bringSelectedForward();    }
@@ -11080,6 +11110,8 @@ var CanvasV2UI = (function () {
     _pinch.lastPinchStart = new Date().toISOString();
     if (isText)                              { _pinch.szMin = 6;  _pinch.szMax = 180; }
     else if (isShape && el.shape === 'line') { _pinch.szMin = 1;  _pinch.szMax = 8;   }
+    else if (isShape && (el.shape === 'circle' || el.shape === 'frame'))
+                                             { _pinch.szMin = 10; _pinch.szMax = 240; } /* v11.2.26 */
     else                                     { _pinch.szMin = 10; _pinch.szMax = 80;  }
     _activeMode = 'pinch';
     _cacheGesture(selId); /* v11.2.18: cache rect + el + controls ONCE */
@@ -11230,6 +11262,7 @@ var CanvasV2UI = (function () {
     var szMin, szMax;
     if (isText)             { szMin = 6;  szMax = 180; }
     else if (isShape && el.shape === 'line') { szMin = 1; szMax = 8; }
+    else if (isShape && (el.shape === 'circle' || el.shape === 'frame')) { szMin = 10; szMax = 240; } /* v11.2.26 */
     else                    { szMin = 10; szMax = 80;  }
 
     _resize.active    = false;
@@ -11505,8 +11538,8 @@ var CanvasV2UI = (function () {
     addElement: function (kind) {
       var order = CanvasV2State.getElementOrder();
       if (order.length >= 20) { console.warn('[CanvasV2] addElement: max 20 elements'); return; }
-      kind = (kind === 'star' || kind === 'line') ? kind : 'text';
-      var prefix = kind === 'text' ? 'text' : kind; /* text / star / line */
+      kind = (kind === 'star' || kind === 'line' || kind === 'circle' || kind === 'frame') ? kind : 'text';
+      var prefix = kind === 'text' ? 'text' : kind; /* text / star / line / circle / frame */
       var id, n;
       for (n = 1; n <= 30; n++) { id = prefix + 'New' + n; if (!CanvasV2State.getElement(id)) break; }
       var config;
@@ -11517,6 +11550,14 @@ var CanvasV2UI = (function () {
       } else if (kind === 'line') {
         config = { id:id, type:'shape', shape:'line', label:{ es:'Línea', en:'Line' },
           x:50, y:50, size:3, width:24, visible:true, opacity:1 };
+      } else if (kind === 'circle') {
+        /* v11.2.26 */
+        config = { id:id, type:'shape', shape:'circle', label:{ es:'Círculo', en:'Circle' },
+          x:50, y:50, size:90, visible:true, opacity:1 };
+      } else if (kind === 'frame') {
+        /* v11.2.26 */
+        config = { id:id, type:'shape', shape:'frame', label:{ es:'Marco', en:'Frame' },
+          x:50, y:50, size:110, width:46, visible:true, opacity:1 };
       } else {
         config = { id:id, type:'shape', shape:'star', label:{ es:'Estrella', en:'Star' },
           x:50, y:50, size:34, visible:true, opacity:1 };
@@ -12261,6 +12302,34 @@ var CanvasV2Export = (function () {
     ctx.globalAlpha = 1;
   }
 
+  /* v11.2.26: círculo relleno — size = diámetro (px@720), centrado en (x,y) */
+  function _drawCircle(ctx, el, W, H, scale, ink) {
+    var d = (el.size || 90) * scale;
+    ctx.fillStyle = ink;
+    ctx.globalAlpha = (el.opacity != null ? el.opacity : 1);
+    ctx.beginPath();
+    ctx.arc((el.x / 100) * W, (el.y / 100) * H, d / 2, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalAlpha = 1;
+  }
+
+  /* v11.2.26: marco rectangular — contorno de 2@720, centrado en (x,y).
+     El DOM usa box-sizing:border-box → el borde queda DENTRO de w×h;
+     aquí se replica encogiendo el trazo media línea hacia dentro. */
+  function _drawFrame(ctx, el, W, H, scale, ink) {
+    var w = ((el.width || 40) / 100) * W;
+    var h = (el.size || 110) * scale;
+    var lw = 2 * scale;
+    var cx = (el.x / 100) * W;
+    var cy = (el.y / 100) * H;
+    ctx.strokeStyle = ink;
+    ctx.lineWidth = lw;
+    ctx.globalAlpha = (el.opacity != null ? el.opacity : 1);
+    _roundRect(ctx, cx - w / 2 + lw / 2, cy - h / 2 + lw / 2, w - lw, h - lw, 2 * scale);
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+  }
+
   function _drawLine(ctx, el, W, H, scale, ink) {
     var w = ((el.width || 16) / 100) * W;
     var h = (el.size || 2) * scale;
@@ -12305,6 +12374,8 @@ var CanvasV2Export = (function () {
         if (el.type === 'text')                            _drawText(ctx, el, W, H, scale, colors.b);
         else if (el.type === 'shape' && el.shape === 'star') _drawStar(ctx, el, W, H, scale, colors.b);
         else if (el.type === 'shape' && el.shape === 'line') _drawLine(ctx, el, W, H, scale, colors.b);
+        else if (el.type === 'shape' && el.shape === 'circle') _drawCircle(ctx, el, W, H, scale, colors.b);
+        else if (el.type === 'shape' && el.shape === 'frame')  _drawFrame(ctx, el, W, H, scale, colors.b);
       });
       return cv;
     });
