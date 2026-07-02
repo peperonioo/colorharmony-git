@@ -8453,6 +8453,12 @@ var CanvasV2State = (function () {
       /* template */
       templateNone:     '— Sin plantilla —',
       confirmTemplate:  '¿Aplicar plantilla? Esto recolocará los elementos del lienzo.',
+      /* export (v11.2.23) */
+      exportDownload:   'Descargar PNG',
+      exportShare:      'Compartir',
+      exportBusy:       'Generando…',
+      exportDone:       '¡Listo!',
+      exportError:      'No se pudo exportar',
       /* misc */
       none:             'Ninguno',
       noSelection:      'Nada seleccionado — toca un elemento del póster.',
@@ -8507,6 +8513,11 @@ var CanvasV2State = (function () {
       resetConfirm:     'Reset the entire poster to default values?',
       templateNone:     '— No template —',
       confirmTemplate:  'Apply template? This will reposition canvas elements.',
+      exportDownload:   'Download PNG',
+      exportShare:      'Share',
+      exportBusy:       'Rendering…',
+      exportDone:       'Done!',
+      exportError:      'Export failed',
       none:             'None',
       noSelection:      'Nothing selected — tap an element on the poster.',
       more:             'More',
@@ -8874,6 +8885,25 @@ var CanvasV2UI = (function () {
       '@media(prefers-reduced-motion: reduce){' +
         '.cv2-more-wrap:not([hidden]){animation:none;}' +
         '.cv2-more-btn svg{transition:none;}}',
+
+      /* ── v11.2.23: barra de exportación (Descargar PNG / Compartir) ── */
+      '.cv2-export-bar{display:flex;gap:10px;width:min(calc(100vw - 48px),720px);margin:16px auto 0;}',
+      '.cv2-export-btn{flex:1;display:flex;align-items:center;justify-content:center;gap:9px;' +
+        'padding:14px 12px;border-radius:14px;border:1px solid var(--line);background:var(--bg-soft);' +
+        'color:var(--ink-dim);font-family:\'JetBrains Mono\',monospace;font-size:10px;font-weight:600;' +
+        'letter-spacing:.13em;text-transform:uppercase;cursor:pointer;touch-action:manipulation;' +
+        'pointer-events:auto;transition:transform .12s var(--ease-yin),box-shadow .2s var(--ease-yin);}',
+      '.cv2-export-btn svg{width:16px;height:16px;flex:0 0 auto;}',
+      '.cv2-export-btn:active{transform:scale(.97);}',
+      '.cv2-export-btn:disabled{opacity:.55;cursor:wait;transform:none;}',
+      '.cv2-export-primary{background:var(--accent);border-color:transparent;color:#151009;' +
+        'box-shadow:0 10px 26px color-mix(in srgb,var(--accent) 28%,transparent);' +
+        'animation:cv2ExportBreathe 3.2s ease-in-out infinite;}',
+      '@media(pointer:fine){.cv2-export-primary:hover{box-shadow:0 14px 32px color-mix(in srgb,var(--accent) 42%,transparent);}' +
+        '.cv2-export-btn:not(.cv2-export-primary):hover{border-color:color-mix(in srgb,var(--accent) 45%,var(--line));color:var(--ink);}}',
+      '@keyframes cv2ExportBreathe{0%,100%{box-shadow:0 10px 26px color-mix(in srgb,var(--accent) 24%,transparent);}' +
+        '50%{box-shadow:0 12px 30px color-mix(in srgb,var(--accent) 44%,transparent);}}',
+      '@media(prefers-reduced-motion: reduce){.cv2-export-primary{animation:none;}}',
 
       /* ── Artboard wrapper — v11.2.2: stronger shadow + subtle border frame ── */
       '.cv2-artboard-wrap{position:relative;width:min(calc(100vw - 48px),720px);max-width:720px;margin:0 auto;' +
@@ -9445,6 +9475,26 @@ var CanvasV2UI = (function () {
       ? 'Tap an element to select it.'
       : 'Toca un elemento para seleccionarlo.';
 
+    /* v11.2.23: barra de exportación — Descargar PNG (+ Compartir si el
+       navegador tiene Web Share). El "wow": del diseño al carrete en un tap. */
+    var canShare = !!(window.CanvasV2Export && CanvasV2Export.canShare());
+    var exportBar =
+      '<div class="cv2-export-bar">' +
+        '<button type="button" class="cv2-export-btn cv2-export-primary" id="cv2-export-download">' +
+          '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
+            '<path d="M12 3v12M7 10l5 5 5-5M4 19h16"/></svg>' +
+          '<span id="cv2-export-download-label">' + _esc(CanvasV2State.ui('exportDownload')) + '</span>' +
+        '</button>' +
+        (canShare
+          ? '<button type="button" class="cv2-export-btn" id="cv2-export-share">' +
+              '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
+                '<circle cx="6" cy="12" r="2.6"/><circle cx="18" cy="6" r="2.6"/><circle cx="18" cy="18" r="2.6"/>' +
+                '<path d="M8.3 10.9l7.4-3.8M8.3 13.1l7.4 3.8"/></svg>' +
+              '<span id="cv2-export-share-label">' + _esc(CanvasV2State.ui('exportShare')) + '</span>' +
+            '</button>'
+          : '') +
+      '</div>';
+
     return (
       '<div class="cv2-chip-row">' +
         '<span class="cv2-chip" id="cv2-prof-chip">' + _esc(profileChip) + '</span>' +
@@ -9455,6 +9505,7 @@ var CanvasV2UI = (function () {
           selLabelHTML +
         '</div>' +
       '</div>' +
+      exportBar +
       '<p class="cv2-preview-hint">' + _esc(hint) + '</p>'
     );
   }
@@ -9476,6 +9527,16 @@ var CanvasV2UI = (function () {
       var lang = CanvasV2State.getLang();
       var hint = lang === 'en' ? 'Tap an element to select it.' : 'Toca un elemento para seleccionarlo.';
       if (hintEl.textContent !== hint) hintEl.textContent = hint;
+    }
+    /* v11.2.23: etiquetas de la barra de exportación siguen al idioma
+       (solo si no están en estado transitorio "Generando…"/"¡Listo!") */
+    var dlLbl = document.getElementById('cv2-export-download-label');
+    if (dlLbl && !dlLbl.dataset.cv2Busy && dlLbl.textContent !== CanvasV2State.ui('exportDownload')) {
+      dlLbl.textContent = CanvasV2State.ui('exportDownload');
+    }
+    var shLbl = document.getElementById('cv2-export-share-label');
+    if (shLbl && !shLbl.dataset.cv2Busy && shLbl.textContent !== CanvasV2State.ui('exportShare')) {
+      shLbl.textContent = CanvasV2State.ui('exportShare');
     }
 
     var elements = CanvasV2State.getState().elements;
@@ -9555,6 +9616,32 @@ var CanvasV2UI = (function () {
     try { txtIn.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (_) {}
     /* Track for debug */
     try { window.__cv2LastTextEditId = CanvasV2State.getSelectedId(); } catch (_) {}
+  }
+
+  /* v11.2.23: click en Descargar/Compartir — feedback "Generando… → ¡Listo!"
+     en el propio botón, y bloqueo mientras se genera el PNG. */
+  function _handleExportClick(btn) {
+    if (!window.CanvasV2Export || btn.disabled) return;
+    var isShare = btn.id === 'cv2-export-share';
+    var lbl = document.getElementById(isShare ? 'cv2-export-share-label' : 'cv2-export-download-label');
+    var normal = CanvasV2State.ui(isShare ? 'exportShare' : 'exportDownload');
+    function setLbl(txt, busy) {
+      if (!lbl) return;
+      lbl.textContent = txt;
+      if (busy) lbl.dataset.cv2Busy = '1'; else delete lbl.dataset.cv2Busy;
+    }
+    btn.disabled = true;
+    setLbl(CanvasV2State.ui('exportBusy'), true);
+    var job = isShare ? CanvasV2Export.share() : CanvasV2Export.download();
+    job.then(function (ok) {
+      setLbl(ok === false ? normal : CanvasV2State.ui('exportDone'), true);
+    }).catch(function (err) {
+      console.warn('[CanvasV2Export] fallo:', err);
+      setLbl(CanvasV2State.ui('exportError'), true);
+    }).then(function () {
+      btn.disabled = false;
+      setTimeout(function () { setLbl(normal, false); }, 1600);
+    });
   }
 
   function installDelegation(root, handlers) {
@@ -9652,6 +9739,10 @@ var CanvasV2UI = (function () {
       var inControls = !!(e.target.closest && e.target.closest('#canvas-v2-controls'));
 
       if (!inControls) {
+        /* v11.2.23: botones Descargar/Compartir bajo el póster */
+        var exBtn = e.target.closest && e.target.closest('.cv2-export-btn');
+        if (exBtn) { _handleExportClick(exBtn); return; }
+
         /* Preview clicks: element selection (+ manual double-click to edit text).
            Use closest() so clicks on inner bits still resolve to the element. */
         var itemEl = e.target.closest && e.target.closest('[data-cv2-id]');
@@ -10601,7 +10692,9 @@ var CanvasV2UI = (function () {
          → el siguiente toque de un dedo parecía un 2º dedo → pinch fantasma).
          Y armar la detección de tap: soltar sin moverse = deseleccionar. */
       delete _activePointers[e.pointerId];
-      _armBgTap(e);
+      /* v11.2.23: tocar Descargar/Compartir no cuenta como "tap en vacío" */
+      var _onExportBar = e.target && e.target.closest && e.target.closest('.cv2-export-bar');
+      if (!_onExportBar) _armBgTap(e);
       return;
     }
 
@@ -11872,6 +11965,264 @@ var CanvasV2UI = (function () {
 
   console.info('[CanvasV2] ' + VERSION + ' canvas-v2-index.js loaded');
 
+})();
+
+
+
+/* ── src/modules/canvas-v2/canvas-v2-export.js ── */
+/* ═══════════════════════════════════════════════════════════════
+   CANVAS V2 — EXPORT (v11.2.23)
+   Exporta el póster como PNG de alta resolución (1080px de ancho).
+
+   Cómo funciona: NO captura el DOM. Redibuja el póster desde
+   CanvasV2State (la fuente de verdad) en un <canvas> 2D:
+     - fondo = color A, tinta = color B (igual que _itemParts en ui.js)
+     - texto: multi-línea, align, MAYÚS, peso, letter-spacing
+       (.04em Fraunces / .18em Mono), line-height:1 — misma geometría
+       que el CSS (half-leading calculado con fontBoundingBox*)
+     - estrella: glifo ✦ centrado en (x,y) como translate(-50%,-50%)
+     - línea: rectángulo redondeado centrado, opacidad × .72
+   Ventaja: sale limpio (sin outline de selección ni handles) y a
+   cualquier resolución.
+
+   Escala: WYSIWYG — usa el ancho real del artboard en pantalla como
+   referencia (el.size está en px de pantalla). Sin artboard montado,
+   referencia = 720 (el ancho máximo del artboard).
+
+   API:
+     CanvasV2Export.renderToCanvas(opts?) → Promise<HTMLCanvasElement>
+     CanvasV2Export.exportBlob(opts?)     → Promise<Blob>
+     CanvasV2Export.download()            → Promise (PNG al disco)
+     CanvasV2Export.share()               → Promise (Web Share API,
+                                            cae a download si no hay)
+     CanvasV2Export.canShare()            → bool (heurística UI)
+   ═══════════════════════════════════════════════════════════════ */
+
+var CanvasV2Export = (function () {
+  'use strict';
+
+  var EXPORT_WIDTH = 1080;          /* px — tamaño post de Instagram */
+  var BASE_ARTBOARD_WIDTH = 720;    /* fallback si el artboard no está montado */
+
+  /* ── helpers de estado/geometría ── */
+
+  function _artboardRect() {
+    var art = document.getElementById('cv2-artboard');
+    if (!art) return null;
+    var r = art.getBoundingClientRect();
+    return (r.width > 0 && r.height > 0) ? r : null;
+  }
+
+  function _fontStack(el) {
+    return el.font === 'mono' ? "'JetBrains Mono', monospace" : "'Fraunces', serif";
+  }
+  function _letterSpacingEm(el) {
+    /* .cv2-item{letter-spacing:.04em}; .cv2-font-mono{letter-spacing:.18em} */
+    return el.font === 'mono' ? 0.18 : 0.04;
+  }
+
+  /* Carga las fuentes que el póster necesita antes de dibujar.
+     Si alguna no llega (offline sin caché), el canvas cae al fallback
+     del stack — igual que haría el DOM. */
+  function _loadFonts(els) {
+    if (!document.fonts || !document.fonts.load) return Promise.resolve();
+    var specs = {};
+    els.forEach(function (el) {
+      if (el.type === 'text') {
+        specs[(el.weight || 400) + ' 16px ' + _fontStack(el)] = (el.text || 'Ag');
+      }
+    });
+    specs["400 16px 'Fraunces', serif"] = '✦'; /* estrella */
+    var jobs = Object.keys(specs).map(function (spec) {
+      return document.fonts.load(spec, specs[spec]).catch(function () {});
+    });
+    return Promise.all(jobs).then(function () {
+      return document.fonts.ready.catch ? document.fonts.ready.catch(function(){}) : document.fonts.ready;
+    }).catch(function () {});
+  }
+
+  /* Métricas verticales tipo CSS line-height:1 (line box = fontSize).
+     half-leading puede ser negativo — exactamente como en CSS. */
+  function _vMetrics(ctx, fontSize) {
+    var m = ctx.measureText('Hg✦');
+    var asc = (m.fontBoundingBoxAscent  != null) ? m.fontBoundingBoxAscent  : fontSize * 0.8;
+    var dsc = (m.fontBoundingBoxDescent != null) ? m.fontBoundingBoxDescent : fontSize * 0.2;
+    var halfLead = (fontSize - (asc + dsc)) / 2;
+    return { ascent: asc, descent: dsc, halfLead: halfLead };
+  }
+
+  function _roundRect(ctx, x, y, w, h, r) {
+    if (typeof ctx.roundRect === 'function') { ctx.beginPath(); ctx.roundRect(x, y, w, h, r); return; }
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y,     x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x,     y + h, r);
+    ctx.arcTo(x,     y + h, x,     y,     r);
+    ctx.arcTo(x,     y,     x + w, y,     r);
+    ctx.closePath();
+  }
+
+  /* ── dibujo de cada tipo de elemento (misma semántica que _itemParts) ── */
+
+  function _drawText(ctx, el, W, H, scale, ink) {
+    var fs = (el.size || 14) * scale;
+    var weight = el.weight || 400;
+    ctx.font = weight + ' ' + fs + 'px ' + _fontStack(el);
+    if ('letterSpacing' in ctx) ctx.letterSpacing = (_letterSpacingEm(el) * fs) + 'px';
+    ctx.fillStyle = ink;
+    ctx.globalAlpha = (el.opacity != null ? el.opacity : 1);
+    var align = el.align || 'center';
+    ctx.textAlign = align;             /* left|center|right — mismos anclajes que el CSS */
+    ctx.textBaseline = 'alphabetic';
+
+    var raw = String(el.text || '');
+    if (el.uppercase) raw = raw.toUpperCase();
+    var lines = raw.split('\n');
+    var vm = _vMetrics(ctx, fs);
+    var x = (el.x / 100) * W;
+    var topY = (el.y / 100) * H;       /* top:y% sin translateY (igual que el texto en DOM) */
+    for (var i = 0; i < lines.length; i++) {
+      var baseline = topY + i * fs + vm.halfLead + vm.ascent;
+      ctx.fillText(lines[i], x, baseline);
+    }
+    if ('letterSpacing' in ctx) ctx.letterSpacing = '0px';
+    ctx.globalAlpha = 1;
+  }
+
+  function _drawStar(ctx, el, W, H, scale, ink) {
+    var fs = (el.size || 22) * scale;
+    ctx.font = '400 ' + fs + "px 'Fraunces', serif"; /* la estrella hereda la fuente del body */
+    ctx.fillStyle = ink;
+    ctx.globalAlpha = (el.opacity != null ? el.opacity : 1);
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'alphabetic';
+    var vm = _vMetrics(ctx, fs);
+    var x = (el.x / 100) * W;
+    /* translate(-50%,-50%): caja de una línea (alto = fs) centrada en y% */
+    var topY = (el.y / 100) * H - fs / 2;
+    ctx.fillText('✦', x, topY + vm.halfLead + vm.ascent);
+    ctx.globalAlpha = 1;
+  }
+
+  function _drawLine(ctx, el, W, H, scale, ink) {
+    var w = ((el.width || 16) / 100) * W;
+    var h = (el.size || 2) * scale;
+    var cx = (el.x / 100) * W;
+    var cy = (el.y / 100) * H;
+    ctx.fillStyle = ink;
+    ctx.globalAlpha = (el.opacity != null ? el.opacity : 1) * 0.72; /* igual que _itemParts */
+    _roundRect(ctx, cx - w / 2, cy - h / 2, w, h, Math.min(h / 2, w / 2));
+    ctx.fill();
+    ctx.globalAlpha = 1;
+  }
+
+  /* ── render principal ── */
+
+  function renderToCanvas(opts) {
+    opts = opts || {};
+    var W = opts.width || EXPORT_WIDTH;
+
+    var rect = _artboardRect();
+    var refWidth = rect ? rect.width : BASE_ARTBOARD_WIDTH;
+    var aspect = rect ? (rect.height / rect.width) : 1.25; /* 4:5 por defecto */
+    var H = Math.round(W * aspect);
+    var scale = W / refWidth;
+
+    var colors = CanvasV2State.getColors();
+    var order = CanvasV2State.getElementOrder();
+    var els = order.map(function (id) { return CanvasV2State.getElement(id); })
+                   .filter(function (el) { return el && el.visible !== false; });
+
+    return _loadFonts(els).then(function () {
+      var cv = document.createElement('canvas');
+      cv.width = W; cv.height = H;
+      var ctx = cv.getContext('2d');
+
+      /* fondo = color A */
+      ctx.fillStyle = colors.a;
+      ctx.fillRect(0, 0, W, H);
+
+      /* elementos en orden de capa (elementOrder = z-order del DOM) */
+      els.forEach(function (el) {
+        if (el.type === 'text')                            _drawText(ctx, el, W, H, scale, colors.b);
+        else if (el.type === 'shape' && el.shape === 'star') _drawStar(ctx, el, W, H, scale, colors.b);
+        else if (el.type === 'shape' && el.shape === 'line') _drawLine(ctx, el, W, H, scale, colors.b);
+      });
+      return cv;
+    });
+  }
+
+  function exportBlob(opts) {
+    return renderToCanvas(opts).then(function (cv) {
+      return new Promise(function (resolve, reject) {
+        cv.toBlob(function (blob) {
+          if (blob) resolve(blob);
+          else reject(new Error('toBlob devolvió null'));
+        }, 'image/png');
+      });
+    });
+  }
+
+  function _fileName() {
+    var d = new Date();
+    function p(n) { return (n < 10 ? '0' : '') + n; }
+    return 'armonia-poster-' + d.getFullYear() + p(d.getMonth() + 1) + p(d.getDate()) +
+           '-' + p(d.getHours()) + p(d.getMinutes()) + '.png';
+  }
+
+  function _downloadBlob(blob) {
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = _fileName();
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(function () { URL.revokeObjectURL(a.href); }, 1500);
+  }
+
+  function download() {
+    return exportBlob().then(function (blob) {
+      _downloadBlob(blob);
+      try { if (window.AppModules && AppModules.Haptics) AppModules.Haptics.select(); } catch (_) {}
+      return true;
+    });
+  }
+
+  /* Heurística para mostrar el botón Compartir (la comprobación real
+     con File se hace dentro de share()). */
+  function canShare() {
+    return !!(navigator.share && navigator.canShare);
+  }
+
+  function share() {
+    return exportBlob().then(function (blob) {
+      var file;
+      try { file = new File([blob], _fileName(), { type: 'image/png' }); } catch (_) { file = null; }
+      if (file && navigator.canShare && navigator.canShare({ files: [file] }) && navigator.share) {
+        return navigator.share({ files: [file], title: 'Armonía de Color' }).then(function () {
+          try { if (window.AppModules && AppModules.Haptics) AppModules.Haptics.select(); } catch (_) {}
+          return true;
+        }).catch(function (err) {
+          /* usuario canceló la hoja de compartir → no es un error */
+          if (err && err.name === 'AbortError') return false;
+          _downloadBlob(blob);
+          return true;
+        });
+      }
+      _downloadBlob(blob); /* sin Web Share → descarga normal */
+      return true;
+    });
+  }
+
+  var api = {
+    renderToCanvas: renderToCanvas,
+    exportBlob:     exportBlob,
+    download:       download,
+    share:          share,
+    canShare:       canShare
+  };
+  window.CanvasV2Export = api;
+  return api;
 })();
 
 
