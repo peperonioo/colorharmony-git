@@ -81,7 +81,7 @@
   setTimeout(function(){hideIntroFailsafe("hard timeout");},7500);
 })();
 </script>
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,400;9..144,600;9..144,800&amp;family=JetBrains+Mono:wght@300;400;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,400;9..144,600;9..144,800&amp;family=JetBrains+Mono:wght@300;400;600&amp;family=Inter:wght@400;600;800&amp;family=Playfair+Display:wght@400;700&amp;family=Bebas+Neue&amp;family=Caveat:wght@400;700&amp;family=Space+Grotesk:wght@400;700&amp;display=swap" rel="stylesheet"/>
 <style>
 /* Armonia de Color v8.2 - Etapa B modular dev CSS */
 /* Source split from single-file v8.1.1 performance hotfix. */
@@ -8138,6 +8138,23 @@ var CanvasV2State = (function () {
      y el export es determinista. Sin migración de datos.
   ───────────────────────────────────────────── */
   var BASE_WIDTH = 720; /* ancho de referencia del artboard */
+
+  /* ─────────────────────────────────────────────
+     v11.2.25 — FUENTES
+     el.font guarda la clave; undefined → 'fraunces' (compat con
+     diseños viejos: los textos sin font eran Fraunces, 'mono' existía).
+     `ls` = letter-spacing en em (antes venía de clases CSS).
+  ───────────────────────────────────────────── */
+  var FONTS = {
+    fraunces: { label: 'Fraunces',      stack: "'Fraunces', serif",           ls: 0.04 },
+    playfair: { label: 'Playfair',      stack: "'Playfair Display', serif",   ls: 0.03 },
+    inter:    { label: 'Inter',         stack: "'Inter', sans-serif",         ls: 0.04 },
+    space:    { label: 'Space Grotesk', stack: "'Space Grotesk', sans-serif", ls: 0.03 },
+    bebas:    { label: 'Bebas Neue',    stack: "'Bebas Neue', sans-serif",    ls: 0.08 },
+    caveat:   { label: 'Caveat',        stack: "'Caveat', cursive",           ls: 0.01 },
+    mono:     { label: 'Mono',          stack: "'JetBrains Mono', monospace", ls: 0.18 }
+  };
+  function fontSpec(key) { return FONTS[key] || FONTS.fraunces; }
   var FORMATS = {
     post:   { css: '4 / 5',  w: 1080, h: 1350 },
     square: { css: '1 / 1',  w: 1080, h: 1080 },
@@ -8448,6 +8465,7 @@ var CanvasV2State = (function () {
       tapToSelect:      'Toca un elemento en la vista previa para seleccionarlo.',
       /* content */
       text:             'Texto',
+      fontLabel:        'Fuente',
       uppercase:        'MAYÚS',
       alignLeft:        'Izq',
       alignCenter:      'Centro',
@@ -8517,6 +8535,7 @@ var CanvasV2State = (function () {
       element:          'Element',
       tapToSelect:      'Tap an element in the preview to select it.',
       text:             'Text',
+      fontLabel:        'Font',
       uppercase:        'UPPER',
       alignLeft:        'Left',
       alignCenter:      'Center',
@@ -8603,6 +8622,10 @@ var CanvasV2State = (function () {
     setFormat:           setFormat,
     formatSpec:          formatSpec,
     sizeToCss:           sizeToCss,
+
+    /* v11.2.25: fuentes */
+    FONTS:               FONTS,
+    fontSpec:            fontSpec,
 
     /* Mutations */
     selectElement:       selectElement,
@@ -8957,6 +8980,17 @@ var CanvasV2UI = (function () {
       '.cv2-artboard-wrap.cv2-fmt-square{width:min(calc(100vw - 48px),720px,78vh);}',
       '.cv2-artboard-wrap.cv2-fmt-story{width:min(calc(100vw - 48px),720px,calc(78vh * 9 / 16));}',
 
+      /* ── v11.2.25: chips de fuente ── */
+      '.cv2-font-chips{display:flex;flex-wrap:wrap;gap:6px;}',
+      '.cv2-font-chip{padding:7px 11px;border:1px solid var(--line);border-radius:999px;' +
+        'background:var(--bg-soft);color:var(--ink-dim);font-size:12.5px;line-height:1;cursor:pointer;' +
+        'touch-action:manipulation;pointer-events:auto;' +
+        'transition:border-color .16s var(--ease-yin),color .16s var(--ease-yin);}',
+      '.cv2-font-chip:active{transform:scale(.96);}',
+      '.cv2-font-on{color:var(--accent);border-color:color-mix(in srgb,var(--accent) 55%,var(--line));' +
+        'background:color-mix(in srgb,var(--accent) 8%,var(--bg-soft));}',
+      '@media(pointer:fine){.cv2-font-chip:not(.cv2-font-on):hover{border-color:color-mix(in srgb,var(--accent) 40%,var(--line));color:var(--ink);}}',
+
       /* ── v11.2.24: picker de formato (segmentado) ── */
       '.cv2-fmt-group{display:flex;gap:6px;}',
       '.cv2-fmt-btn{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;' +
@@ -9273,6 +9307,19 @@ var CanvasV2UI = (function () {
             '<span class="cv2-label" style="padding-top:6px;">' + CanvasV2State.ui('text') + '</span>',
             '<textarea class="cv2-textarea" id="cv2-text-inp" rows="2">' + textVal + '</textarea>',
           '</div>',
+          /* v11.2.25: picker de fuente — cada chip en su propia tipografía */
+          '<div class="cv2-sec-title" style="margin-top:10px;">' + CanvasV2State.ui('fontLabel') + '</div>',
+          '<div class="cv2-font-chips" id="cv2-font-chips">',
+            (function () {
+              var curFont = el.font && CanvasV2State.FONTS[el.font] ? el.font : 'fraunces';
+              return Object.keys(CanvasV2State.FONTS).map(function (fk) {
+                var f = CanvasV2State.FONTS[fk];
+                return '<button type="button" class="cv2-font-chip' + (fk === curFont ? ' cv2-font-on' : '') + '" ' +
+                  'data-cv2-action="set-font" data-cv2-font="' + fk + '" ' +
+                  'style="font-family:' + f.stack.replace(/"/g, '&quot;') + ';">' + _esc(f.label) + '</button>';
+              }).join('');
+            })(),
+          '</div>',
           /* v11.2.11: "Edit text" button removed — double-click the text on the poster instead */
           '<div class="cv2-row cv2-row-controls">',
             '<button class="cv2-tog' + ucClass + '" id="cv2-uppercase">' + CanvasV2State.ui('uppercase') + '</button>',
@@ -9505,6 +9552,11 @@ var CanvasV2UI = (function () {
       classes.push('cv2-type-text');
       if (el.font === 'mono') classes.push('cv2-font-mono');
       classes.push('cv2-align-' + (el.align || 'center'));
+      /* v11.2.25: fuente + letter-spacing inline desde el registro FONTS
+         (pisa las clases; el.font undefined → Fraunces, compat total) */
+      var fspec = CanvasV2State.fontSpec(el.font);
+      styleProps.push('font-family:' + fspec.stack);
+      styleProps.push('letter-spacing:' + fspec.ls + 'em');
       if (el.uppercase) styleProps.push('text-transform:uppercase');
       if (el.weight)    styleProps.push('font-weight:' + el.weight);
       var textDisplay = (el.text || '')
@@ -9879,6 +9931,17 @@ var CanvasV2UI = (function () {
         else if (action === 'toggle-more')      { toggleMore(); return; }
         else if (action === 'set-format') {
           if (window.CanvasV2 && window.CanvasV2.setFormat) window.CanvasV2.setFormat(actionBtn.dataset.cv2Format);
+        }
+        else if (action === 'set-font') {
+          /* v11.2.25: cambia la fuente del elemento seleccionado */
+          var sfId = CanvasV2State.getSelectedId();
+          if (sfId && window.CanvasV2) {
+            window.CanvasV2.updateElement(sfId, { font: actionBtn.dataset.cv2Font });
+            var chips = document.querySelectorAll('#cv2-font-chips .cv2-font-chip');
+            for (var ci = 0; ci < chips.length; ci++) {
+              chips[ci].classList.toggle('cv2-font-on', chips[ci] === actionBtn);
+            }
+          }
         }
         else if (action === 'reset-canvas') {
           if (window.confirm(CanvasV2State.ui('resetConfirm'))) {
@@ -12106,12 +12169,13 @@ var CanvasV2Export = (function () {
 
   /* ── helpers de estado/geometría ── */
 
+  /* v11.2.25: fuente + letter-spacing desde el registro FONTS del estado
+     (misma fuente de verdad que _itemParts en ui.js) */
   function _fontStack(el) {
-    return el.font === 'mono' ? "'JetBrains Mono', monospace" : "'Fraunces', serif";
+    return CanvasV2State.fontSpec(el.font).stack;
   }
   function _letterSpacingEm(el) {
-    /* .cv2-item{letter-spacing:.04em}; .cv2-font-mono{letter-spacing:.18em} */
-    return el.font === 'mono' ? 0.18 : 0.04;
+    return CanvasV2State.fontSpec(el.font).ls;
   }
 
   /* Carga las fuentes que el póster necesita antes de dibujar.
