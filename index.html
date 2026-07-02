@@ -1117,7 +1117,10 @@ html[data-tab-changing="1"] .info-panel{transform:translateZ(0);backface-visibil
 /* v9.0 Guided Identity + Mobile Interaction Cleanup */
 /* v10.0.2: subtitle is always hidden — the element is intentionally empty. */
 .subtitle{display:none!important;visibility:hidden!important;}
-.wheel-section,#wheel,#swatches,#arrows,#exact-markers,#ticks,.arc-group,.arc-path{touch-action:none!important;-ms-touch-action:none!important;}
+/* v11.2.28: .wheel-section FUERA de esta lista — la sección entera (560px de alto,
+   100vw en móvil) bloqueaba el scroll de página si el swipe empezaba en ella
+   ("hay como un tope"). Solo la rueda SVG (#wheel) necesita capturar el gesto. */
+#wheel,#swatches,#arrows,#exact-markers,#ticks,.arc-group,.arc-path{touch-action:none!important;-ms-touch-action:none!important;}
 html[data-gesture="wheel"],html[data-mobile-lock="wheel"]{overscroll-behavior:none!important;}
 html[data-gesture="wheel"] body,html[data-mobile-lock="wheel"] body{overflow:hidden;touch-action:none!important;}
 .identity-tour{position:fixed;inset:0;z-index:980;display:none;pointer-events:none;background:transparent!important;}
