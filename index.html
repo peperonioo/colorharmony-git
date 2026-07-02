@@ -8152,6 +8152,8 @@ var CanvasV2State = (function () {
      MUTATIONS
   ───────────────────────────────────────────── */
   function selectElement(id) {
+    /* v11.2.22: null explícito = "nada seleccionado" (tap en zona vacía) */
+    if (id === null) { _state.selectedElementId = null; return; }
     if (id && _state.elements[id]) _state.selectedElementId = id;
   }
 
@@ -8453,6 +8455,9 @@ var CanvasV2State = (function () {
       confirmTemplate:  '¿Aplicar plantilla? Esto recolocará los elementos del lienzo.',
       /* misc */
       none:             'Ninguno',
+      noSelection:      'Nada seleccionado — toca un elemento del póster.',
+      more:             'Más',
+      less:             'Menos',
       hidden:           '(oculto)',
       autosaved:        'Guardado automáticamente',
       unsaved:          'Cambios sin guardar',
@@ -8503,6 +8508,9 @@ var CanvasV2State = (function () {
       templateNone:     '— No template —',
       confirmTemplate:  'Apply template? This will reposition canvas elements.',
       none:             'None',
+      noSelection:      'Nothing selected — tap an element on the poster.',
+      more:             'More',
+      less:             'Less',
       hidden:           '(hidden)',
       autosaved:        'Autosaved',
       unsaved:          'Unsaved changes',
@@ -8848,6 +8856,24 @@ var CanvasV2UI = (function () {
       '.cv2-btn-danger:active{background:rgba(239,83,80,.12);}',
       /* Reset canvas spans full width */
       '.cv2-btn-full{grid-column:1 / -1;}',
+      /* ── v11.2.22: desplegable "Más" (Contenido + Estilo) ── */
+      '.cv2-more-btn{display:flex;align-items:center;justify-content:center;gap:6px;width:100%;' +
+        'background:var(--bg-soft);border:1px solid var(--line);border-radius:10px;' +
+        'color:var(--ink-dim);font-family:\'JetBrains Mono\',monospace;font-size:8px;' +
+        'letter-spacing:.14em;text-transform:uppercase;padding:9px 8px;cursor:pointer;' +
+        'touch-action:manipulation;pointer-events:auto;margin:14px 0 0;}',
+      /* el botón/wrap rompen la cadena .cv2-sec+.cv2-sec — restaurar el ritmo */
+      '.cv2-more-wrap+.cv2-sec{border-top:1px solid rgba(255,255,255,.04);margin-top:14px;padding-top:14px;}',
+      '.cv2-more-wrap>.cv2-sec:first-child{margin-top:12px;}',
+      '.cv2-more-btn:active{background:rgba(255,255,255,.07);}',
+      '.cv2-more-btn svg{width:13px;height:13px;transition:transform .22s var(--ease-yin);}',
+      '.cv2-more-btn.cv2-more-open svg{transform:rotate(180deg);}',
+      '@media(pointer:fine){.cv2-more-btn:hover{border-color:color-mix(in srgb,var(--accent) 45%,var(--line));color:var(--ink);}}',
+      '.cv2-more-wrap:not([hidden]){animation:cv2MoreIn .26s var(--ease-yin);}',
+      '@keyframes cv2MoreIn{from{opacity:0;transform:translateY(-5px);}to{opacity:1;transform:none;}}',
+      '@media(prefers-reduced-motion: reduce){' +
+        '.cv2-more-wrap:not([hidden]){animation:none;}' +
+        '.cv2-more-btn svg{transition:none;}}',
 
       /* ── Artboard wrapper — v11.2.2: stronger shadow + subtle border frame ── */
       '.cv2-artboard-wrap{position:relative;width:min(calc(100vw - 48px),720px);max-width:720px;margin:0 auto;' +
@@ -9010,9 +9036,35 @@ var CanvasV2UI = (function () {
   }
 
   /* ─────────────────────────────────────────────
+     v11.2.22 — DESPLEGABLE "MÁS" (Contenido + Estilo)
+     El estado abierto/cerrado sobrevive a los rebuilds del panel
+     (variable de módulo, no se persiste entre sesiones).
+  ───────────────────────────────────────────── */
+  var _moreOpen = false;
+
+  function _applyMoreState() {
+    var wrap = document.getElementById('cv2-more-wrap');
+    var btn  = document.getElementById('cv2-more-btn');
+    if (wrap) {
+      if (_moreOpen) wrap.removeAttribute('hidden');
+      else wrap.setAttribute('hidden', '');
+    }
+    if (btn) {
+      btn.setAttribute('aria-expanded', _moreOpen ? 'true' : 'false');
+      btn.classList.toggle('cv2-more-open', _moreOpen);
+    }
+    var lbl = document.getElementById('cv2-more-btn-label');
+    if (lbl) lbl.textContent = CanvasV2State.ui(_moreOpen ? 'less' : 'more');
+  }
+  function toggleMore() { _moreOpen = !_moreOpen; _applyMoreState(); }
+  function openMore()   { if (!_moreOpen) { _moreOpen = true; _applyMoreState(); } }
+
+  /* ─────────────────────────────────────────────
      BUILD CONTROLS HTML — section-based
   ───────────────────────────────────────────── */
   function buildControlsHTML(selId) {
+    /* v11.2.22: selId puede ser null = "nada seleccionado" (tap en zona vacía) */
+    var hasSel  = !!(selId && CanvasV2State.getElement(selId));
     var el      = CanvasV2State.getElement(selId) || {};
     var isText  = CanvasV2State.isTextElement(selId);
     var isShape = CanvasV2State.isShapeElement(selId);
@@ -9046,9 +9098,10 @@ var CanvasV2UI = (function () {
     var tbOrder = CanvasV2State.getElementOrder();
     var tbCanAdd = tbOrder.length < 20;
     var tbIdx   = tbOrder.indexOf(selId);
-    var tbCanDel= tbOrder.length > 1;
-    var tbCanFwd= tbIdx < tbOrder.length - 1;
-    var tbCanBwd= tbIdx > 0;
+    /* v11.2.22: sin selección, las acciones por-elemento se deshabilitan */
+    var tbCanDel= hasSel && tbOrder.length > 1;
+    var tbCanFwd= hasSel && tbIdx < tbOrder.length - 1;
+    var tbCanBwd= hasSel && tbIdx > 0;
     var tbIsVis = (function(){ var e = CanvasV2State.getElement(selId); return !e || e.visible !== false; })();
     parts.push(
       '<div class="cv2-sec">',
@@ -9057,10 +9110,10 @@ var CanvasV2UI = (function () {
           _tool('add-star', 'star', CanvasV2State.ui('addStar2'), 'cv2-tool-add', !tbCanAdd),
           _tool('add-line', 'line', CanvasV2State.ui('addLine2'), 'cv2-tool-add', !tbCanAdd),
           '<span class="cv2-tool-div"></span>',
-          _tool('duplicate-selected', 'dup',  CanvasV2State.ui('duplicate'), '', false),
+          _tool('duplicate-selected', 'dup',  CanvasV2State.ui('duplicate'), '', !hasSel),
           _tool('bring-forward',      'fwd',  CanvasV2State.ui('forward'),   '', !tbCanFwd),
           _tool('send-backward',      'back', CanvasV2State.ui('backward'),  '', !tbCanBwd),
-          _tool('toggle-visibility',  'eye',  tbIsVis ? CanvasV2State.ui('hide') : CanvasV2State.ui('show'), '', false),
+          _tool('toggle-visibility',  'eye',  tbIsVis ? CanvasV2State.ui('hide') : CanvasV2State.ui('show'), '', !hasSel),
           _tool('delete-selected',    'trash',CanvasV2State.ui('deleteEl'),  'cv2-tool-danger', !tbCanDel),
         '</div>',
       '</div>'
@@ -9076,6 +9129,11 @@ var CanvasV2UI = (function () {
       return '<option value="' + id + '"' + sel + '>' + _esc(lbl + hidSuffix) + '</option>';
     }).join('');
 
+    /* v11.2.22: sin selección → opción vacía "Ninguno" al frente */
+    if (!hasSel) {
+      elOpts = '<option value="" selected>— ' + _esc(CanvasV2State.ui('none')) + ' —</option>' + elOpts;
+    }
+
     parts.push(
       '<div class="cv2-sec">',
         '<div class="cv2-sec-title">' + CanvasV2State.ui('sectionElement') + '</div>',
@@ -9084,14 +9142,24 @@ var CanvasV2UI = (function () {
       '</div>'
     );
 
-    /* ── Section C: Content ── */
+    /* ── v11.2.22: sin selección → nota + saltar secciones por-elemento ── */
+    if (!hasSel) {
+      parts.push(
+        '<div class="cv2-sec">',
+          '<div class="cv2-note">' + _esc(CanvasV2State.ui('noSelection')) + '</div>',
+        '</div>'
+      );
+    }
+
+    /* ── Section C: Content — v11.2.22: vive dentro del desplegable "Más" ── */
+    var moreParts = [];
     if (isText) {
       var textVal = _esc(el.text || '');
       var ucClass = ucOn ? ' cv2-tog-on' : '';
       var alL = align === 'left'   ? ' cv2-align-on' : '';
       var alC = align === 'center' ? ' cv2-align-on' : '';
       var alR = align === 'right'  ? ' cv2-align-on' : '';
-      parts.push(
+      moreParts.push(
         '<div class="cv2-sec">',
           '<div class="cv2-sec-title">' + CanvasV2State.ui('sectionContent') + '</div>',
           '<div class="cv2-row" style="align-items:flex-start;">',
@@ -9111,7 +9179,7 @@ var CanvasV2UI = (function () {
       );
     } else if (isShape) {
       var shapeType = el.shape || 'shape';
-      parts.push(
+      moreParts.push(
         '<div class="cv2-sec">',
           '<div class="cv2-sec-title">' + CanvasV2State.ui('sectionContent') + '</div>',
           '<div class="cv2-row">',
@@ -9123,7 +9191,7 @@ var CanvasV2UI = (function () {
     }
 
     /* ── Section D: Position — nudge buttons primary, sliders in advanced panel ── */
-    parts.push(
+    if (hasSel) parts.push(
       '<div class="cv2-sec">',
         '<div class="cv2-sec-title">' + CanvasV2State.ui('sectionPosition') + '</div>',
         /* v11.2.11: nudge arrows, Center H/V and fine X/Y sliders removed —
@@ -9133,15 +9201,16 @@ var CanvasV2UI = (function () {
       '</div>'
     );
 
-    /* ── Section E: Style — weight / line width / opacity (size via pinch/handle) ── */
-    parts.push(
+    /* ── Section E: Style — weight / line width / opacity (size via pinch/handle)
+       v11.2.22: también dentro del desplegable "Más" ── */
+    moreParts.push(
       '<div class="cv2-sec">',
         '<div class="cv2-sec-title">' + CanvasV2State.ui('sectionStyle') + '</div>'
         /* v11.2.11: size −/+ buttons + fine size slider removed — resize by pinch
            on mobile or the corner handle on desktop. */
     );
     if (isText) {
-      parts.push(
+      moreParts.push(
         '<div class="cv2-row">',
           '<span class="cv2-label">' + CanvasV2State.ui('weight') + '</span>',
           '<input class="cv2-range" id="cv2-weight" type="range" min="100" max="900" step="100" value="' + wtVal + '">',
@@ -9151,7 +9220,7 @@ var CanvasV2UI = (function () {
     }
     if (isShape && el.shape === 'line') {
       var wdVal = Math.round(el.width || 16);
-      parts.push(
+      moreParts.push(
         '<div class="cv2-row">',
           '<span class="cv2-label">' + CanvasV2State.ui('lineWidth') + '</span>',
           '<input class="cv2-range" id="cv2-linewidth" type="range" min="2" max="80" step="1" value="' + wdVal + '">',
@@ -9159,7 +9228,7 @@ var CanvasV2UI = (function () {
         '</div>'
       );
     }
-    parts.push(
+    moreParts.push(
         '<div class="cv2-row">',
           '<span class="cv2-label">' + CanvasV2State.ui('opacity') + '</span>',
           '<input class="cv2-range" id="cv2-opacity" type="range" min="0" max="100" step="1" value="' + opVal + '">',
@@ -9167,6 +9236,22 @@ var CanvasV2UI = (function () {
         '</div>',
       '</div>' /* close section E */
     );
+
+    /* ── v11.2.22: desplegable "Más" — envuelve Contenido + Estilo ── */
+    if (hasSel) {
+      parts.push(
+        '<button type="button" class="cv2-more-btn' + (_moreOpen ? ' cv2-more-open' : '') + '" ' +
+          'id="cv2-more-btn" data-cv2-action="toggle-more" ' +
+          'aria-expanded="' + (_moreOpen ? 'true' : 'false') + '" aria-controls="cv2-more-wrap">',
+          '<span id="cv2-more-btn-label">' + _esc(CanvasV2State.ui(_moreOpen ? 'less' : 'more')) + '</span>',
+          '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" ' +
+            'stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>',
+        '</button>',
+        '<div class="cv2-more-wrap" id="cv2-more-wrap"' + (_moreOpen ? '' : ' hidden') + '>',
+          moreParts.join(''),
+        '</div>'
+      );
+    }
 
     /* ── Template section ── */
     var tmplKeys = Object.keys(CanvasV2State.TEMPLATES);
@@ -9189,7 +9274,7 @@ var CanvasV2UI = (function () {
       '<div class="cv2-sec">',
         '<div class="cv2-sec-title">' + CanvasV2State.ui('sectionActions') + '</div>',
         '<div class="cv2-actions-grid">',
-          '<button class="cv2-btn" data-cv2-action="reset-selected">' + CanvasV2State.ui('reset') + '</button>',
+          '<button class="cv2-btn" data-cv2-action="reset-selected"' + (hasSel ? '' : ' disabled') + '>' + CanvasV2State.ui('reset') + '</button>',
           '<button class="cv2-btn cv2-btn-danger" data-cv2-action="reset-canvas">' + CanvasV2State.ui('resetCanvas') + '</button>',
         '</div>',
       '</div>'
@@ -9462,6 +9547,7 @@ var CanvasV2UI = (function () {
 
   /* Focus text textarea helper */
   function _focusTextInput() {
+    openMore(); /* v11.2.22: el textarea vive dentro del desplegable "Más" */
     var txtIn = document.getElementById('cv2-text-inp');
     if (!txtIn) return;
     txtIn.focus();
@@ -9543,8 +9629,9 @@ var CanvasV2UI = (function () {
       if (!tid) return;
 
       if (tid === 'cv2-el-sel') {
-        var newId = e.target.value || 'title';
-        if (window.CanvasV2) window.CanvasV2.selectElement(newId);
+        /* v11.2.22: la opción vacía "Ninguno" no selecciona nada */
+        var newId = e.target.value;
+        if (newId && window.CanvasV2) window.CanvasV2.selectElement(newId);
 
       } else if (tid === 'cv2-template-sel') {
         var key = e.target.value;
@@ -9613,6 +9700,7 @@ var CanvasV2UI = (function () {
         else if (action === 'send-backward')    { if (window.CanvasV2) window.CanvasV2.sendSelectedBackward();    }
         else if (action === 'reset-selected')   { if (window.CanvasV2) window.CanvasV2.resetSelected();           }
         else if (action === 'toggle-visibility') { if (window.CanvasV2) window.CanvasV2.toggleSelectedVisibility(); }
+        else if (action === 'toggle-more')      { toggleMore(); return; }
         else if (action === 'reset-canvas') {
           if (window.confirm(CanvasV2State.ui('resetConfirm'))) {
             if (window.CanvasV2) window.CanvasV2.resetCanvas();
@@ -9737,7 +9825,9 @@ var CanvasV2UI = (function () {
     syncControlValues: syncControlValues,
     renderPreviewHTML: renderPreviewHTML,   /* first paint (builds shell) */
     reconcilePreview:  reconcilePreview,     /* v11.2.4 in-place updates */
-    installDelegation: installDelegation
+    installDelegation: installDelegation,
+    toggleMore:        toggleMore,           /* v11.2.22 desplegable "Más" */
+    openMore:          openMore
   };
 
 })();
@@ -10202,6 +10292,8 @@ var CanvasV2UI = (function () {
   function _isEditingText() { return !!_textEdit.editingId; }
 
   function _focusControlsTextarea() {
+    /* v11.2.22: el textarea vive dentro del desplegable "Más" — abrirlo antes */
+    try { if (CanvasV2UI.openMore) CanvasV2UI.openMore(); } catch (_) {}
     var txtIn = document.getElementById('cv2-text-inp');
     if (!txtIn) return false;
     try {
@@ -10431,6 +10523,41 @@ var CanvasV2UI = (function () {
     return { x: (p1.x + p2.x) / 2, y: (p1.y + p2.y) / 2 };
   }
 
+  /* ─────────────────────────────────────────────
+     v11.2.22 — TAP EN ZONA VACÍA = DESELECCIONAR
+     Armado desde _onDragPointerDown cuando el toque no cayó en ningún
+     elemento. Si el puntero se suelta sin superar el umbral de drag
+     (es decir: fue un tap, no un swipe de scroll), se deselecciona.
+  ───────────────────────────────────────────── */
+  var _bgTap = { id: null, x: 0, y: 0 };
+
+  function _armBgTap(e) {
+    _bgTap.id = e.pointerId;
+    _bgTap.x  = e.clientX;
+    _bgTap.y  = e.clientY;
+    document.addEventListener('pointerup',     _onBgTapUp,     false);
+    document.addEventListener('pointercancel', _onBgTapCancel, false);
+  }
+  function _disarmBgTap() {
+    _bgTap.id = null;
+    document.removeEventListener('pointerup',     _onBgTapUp,     false);
+    document.removeEventListener('pointercancel', _onBgTapCancel, false);
+  }
+  function _onBgTapUp(e) {
+    if (e.pointerId !== _bgTap.id) return;
+    var dx = e.clientX - _bgTap.x;
+    var dy = e.clientY - _bgTap.y;
+    _disarmBgTap();
+    if (Math.sqrt(dx * dx + dy * dy) >= DRAG_THRESHOLD_PX) return; /* swipe/scroll, no tap */
+    if (_isEditingText()) return;      /* el editor inline gestiona su propio blur */
+    if (_activeMode === 'pinch' || _pinch.active || _drag.active) return; /* 3er dedo durante un gesto */
+    if (CanvasV2State.getSelectedId() && window.CanvasV2) window.CanvasV2.deselect();
+  }
+  function _onBgTapCancel(e) {
+    if (e.pointerId !== _bgTap.id) return;
+    _disarmBgTap();
+  }
+
   function _installDragHandlers() {
     var prevEl = document.getElementById('canvas-v2-preview');
     if (!prevEl || prevEl.dataset.cv2DragInstalled) return;
@@ -10454,6 +10581,10 @@ var CanvasV2UI = (function () {
     /* v11.2.9: second finger → switch to pinch-to-resize mode */
     if (Object.keys(_activePointers).length === 2) {
       _startPinch();
+      /* v11.2.22: si el pinch no arrancó (nada seleccionado / elemento oculto),
+         soltar este puntero — si se queda registrado, el siguiente toque de UN
+         dedo contaría como dos y dispararía un pinch falso. */
+      if (!_pinch.active) delete _activePointers[e.pointerId];
       return;
     }
 
@@ -10464,7 +10595,15 @@ var CanvasV2UI = (function () {
       if (target.dataset && target.dataset.cv2Id) { cv2Id = target.dataset.cv2Id; break; }
       target = target.parentElement;
     }
-    if (!cv2Id) return; /* clicked background / label / chip — no drag */
+    if (!cv2Id) {
+      /* v11.2.22: toque en fondo/etiqueta/chip — nunca será drag ni pinch.
+         Soltarlo de _activePointers YA (antes quedaba registrado para siempre
+         → el siguiente toque de un dedo parecía un 2º dedo → pinch fantasma).
+         Y armar la detección de tap: soltar sin moverse = deseleccionar. */
+      delete _activePointers[e.pointerId];
+      _armBgTap(e);
+      return;
+    }
 
     var el = CanvasV2State.getElement(cv2Id);
     if (!el || el.visible === false) return;
@@ -10488,7 +10627,14 @@ var CanvasV2UI = (function () {
     _drag.lastDragStart = new Date().toISOString();
 
     /* Update selection state (no HTML rebuild — click handler does that for pure clicks) */
+    var _prevSelected = CanvasV2State.getSelectedId();
     try { CanvasV2State.selectElement(cv2Id); } catch (_) {}
+    /* v11.2.22: si veníamos de "nada seleccionado", el panel está en modo vacío
+       (botones deshabilitados) y el click posterior NO lo reconstruye porque el
+       estado ya coincide — reconstruirlo aquí una vez. */
+    if (_prevSelected === null && window.CanvasV2) {
+      try { window.CanvasV2.renderControls(cv2Id); } catch (_) {}
+    }
 
     /* Immediate visual: apply is-selected class directly without full HTML rebuild */
     try {
@@ -10576,8 +10722,15 @@ var CanvasV2UI = (function () {
     if (e) delete _activePointers[e.pointerId]; /* v11.2.9 */
     _cleanupDrag(false);
   }
-  function _onDragWindowBlur()    { _cleanupDrag(false); }
-  function _onDragVisibility()    { if (document.visibilityState !== 'visible') _cleanupDrag(false); }
+  /* v11.2.22: al abortar por blur/ocultar pestaña ya no llega ningún pointerup,
+     así que hay que soltar el puntero del drag aquí — si no, queda fantasma. */
+  function _dropDragPointer() {
+    if (_drag.pointerId !== null && _drag.pointerId !== undefined) {
+      delete _activePointers[_drag.pointerId];
+    }
+  }
+  function _onDragWindowBlur()    { _dropDragPointer(); _cleanupDrag(false); }
+  function _onDragVisibility()    { if (document.visibilityState !== 'visible') { _dropDragPointer(); _cleanupDrag(false); } }
 
   function _cleanupDrag(doSave) {
     /* Remove temporary document-level handlers */
@@ -10978,7 +11131,10 @@ var CanvasV2UI = (function () {
     renderControls: function (selId) {
       var ctrlEl = document.getElementById('canvas-v2-controls');
       if (!ctrlEl) return;
-      selId = selId || CanvasV2State.getSelectedId() || 'title';
+      /* v11.2.22: null explícito = renderizar el modo "nada seleccionado".
+         Solo sin argumento se cae al seleccionado actual (o 'title' de arranque). */
+      if (selId === undefined) selId = CanvasV2State.getSelectedId();
+      if (selId === undefined) selId = 'title';
       ctrlEl.innerHTML = CanvasV2UI.buildControlsHTML(selId);
       _lastControlEvent = null;
       console.info('[CanvasV2] controls rendered for:', selId);
@@ -11015,6 +11171,17 @@ var CanvasV2UI = (function () {
       CanvasV2.renderPreview();
       _lastControlEvent = Date.now();
       _save('selectElement:' + id);
+    },
+
+    /* ── deselect() — v11.2.22: tap en zona vacía → nada seleccionado ── */
+    deselect: function () {
+      if (CanvasV2State.getSelectedId() === null) return;
+      CanvasV2State.selectElement(null);
+      CanvasV2.renderControls(null);
+      CanvasV2.renderPreview('deselect');
+      _lastControlEvent = Date.now();
+      _save('deselect');
+      console.info('[CanvasV2] deselected (tap on empty area)');
     },
 
     /* ── updateElement(id, patch) ── */
