@@ -129,7 +129,9 @@
   --code-bg:rgba(0,0,0,.04);
   --ok-strong:#053817;
 }
-html,body{background:var(--bg);color:var(--ink);font-family:'Fraunces',serif;min-height:100vh;overflow-x:hidden;}
+/* v11.2.31: touch-action:manipulation = SIN zoom por doble tap (el pinch-zoom y el
+   scroll siguen funcionando; los elementos con su propio touch-action lo conservan). */
+html,body{background:var(--bg);color:var(--ink);font-family:'Fraunces',serif;min-height:100vh;overflow-x:hidden;touch-action:manipulation;}
 html[data-gesture="wheel"],html[data-gesture="picker"],html[data-gesture="canvas"],html[data-gesture="canvas-resize"]{user-select:none;-webkit-user-select:none;}
 html[data-gesture="wheel"] body,html[data-gesture="picker"] body,html[data-gesture="canvas"] body{overscroll-behavior:contain;}
 body::before{display:none;}
@@ -821,7 +823,9 @@ html[data-lang="en"] [data-view="wheel"], html[data-lang="en"] #btn-wheel{font-s
 /* v8.4 Mobile UX & Performance Pass
    Purpose: real mobile centering, less repaint, dynamic viewport and smoother wheel. */
 @media(max-width:760px){
-  html,body{width:100%;min-height:100dvh;overflow-x:hidden;overscroll-behavior-y:none;}
+  /* v11.2.31: contain (no none) — conserva el rebote natural de iOS (el scroll con
+     "none" se sentía muerto) pero sigue bloqueando pull-to-refresh y encadenado. */
+  html,body{width:100%;min-height:100dvh;overflow-x:hidden;overscroll-behavior-y:contain;}
   body{min-height:100dvh;-webkit-text-size-adjust:100%;}
   #plasma-bg{opacity:.72;transform:translateZ(0);}
   .container{width:100%;max-width:100vw!important;padding:calc(env(safe-area-inset-top,0px) + 14px) 10px 58px!important;margin:0 auto!important;overflow-x:hidden!important;}
@@ -1110,6 +1114,12 @@ html[data-tab-changing="1"] .info-panel{transform:translateZ(0);backface-visibil
   #settings-panel{max-height:calc(100dvh - 94px);overflow:auto;-webkit-overflow-scrolling:touch;}
 }
 @media(min-width:761px){.nav-swipe-hint{display:none;}}
+/* v11.2.31: mientras se scrollea (html[data-scrolling], lo pone patches.js) las
+   animaciones decorativas infinitas (respiraciones con box-shadow/drop-shadow,
+   hormigas de la rueda) se PAUSAN — pintan cada frame y ensuciaban el scroll. */
+html[data-scrolling="1"] #wheel *,
+html[data-scrolling="1"] .cslot,
+html[data-scrolling="1"] .cv2-export-primary{animation-play-state:paused!important;}
 
 </style>
 
@@ -7139,7 +7149,9 @@ if ('serviceWorker' in navigator) {
       if(document.documentElement.dataset.cv2InputActive==='1'){start=null;return;}
       if(activeIndex()===2){start=null;return;}
       const dx=e.clientX-start.x, dy=e.clientY-start.y, dt=Date.now()-start.t; start=null;
-      if(Math.abs(dx)<64||Math.abs(dx)<Math.abs(dy)*1.45||dt>900)return;
+      /* v11.2.31: umbrales más estrictos — un scroll diagonal ya NO cambia de pestaña
+         (missclick). Hace falta un swipe claramente horizontal, largo y rápido. */
+      if(Math.abs(dx)<84||Math.abs(dx)<Math.abs(dy)*2.2||dt>650)return;
       const i=activeIndex(); const next=dx<0?Math.min(tabs.length-1,i+1):Math.max(0,i-1);
       if(next===i)return;
       const btn=$(tabs[next].btn); if(!btn)return;
@@ -7154,8 +7166,22 @@ if ('serviceWorker' in navigator) {
     if(active&&!active.classList.contains('active'))active.classList.add('active');
     safe(()=>window.AppModules&&AppModules.Motion&&AppModules.Motion.nav&&AppModules.Motion.nav.sync(false,{force:true,reason:'v94-stabilize'}),null);
   }
-  ['resize','orientationchange','scroll'].forEach(ev=>window.addEventListener(ev,()=>setTimeout(stabilizeNav,80),{passive:true}));
-  setInterval(stabilizeNav,2500);
+  /* v11.2.31: FLUIDEZ DE SCROLL.
+     Antes: CADA evento de scroll encolaba su propio timeout de 80ms hacia stabilizeNav
+     → durante un fling se ejecutaban decenas de stabilizeNav() (mediciones con
+     getBoundingClientRect + escrituras SVG del nav) = trompicones.
+     Ahora: un solo timer con trailing debounce (corre UNA vez, 180ms después de
+     que el scroll pare) + html[data-scrolling] pausa las animaciones decorativas
+     mientras dura el gesto (CSS en template). */
+  let _stabT=null;
+  function _onScrollish(){
+    const root=document.documentElement;
+    if(root.dataset.scrolling!=='1')root.dataset.scrolling='1';
+    clearTimeout(_stabT);
+    _stabT=setTimeout(()=>{delete root.dataset.scrolling;stabilizeNav();},180);
+  }
+  ['resize','orientationchange','scroll'].forEach(ev=>window.addEventListener(ev,_onScrollish,{passive:true}));
+  setInterval(()=>{if(document.documentElement.dataset.scrolling!=='1')stabilizeNav();},2500);
 
   // 5) Language default remains phone-based until the user changes it manually.
   function installPhoneLanguageDefault(){
@@ -11049,23 +11075,30 @@ var CanvasV2UI = (function () {
     _drag.pointerCaptureUsed = false;
     _drag.lastDragStart = new Date().toISOString();
 
-    /* Update selection state (no HTML rebuild — click handler does that for pure clicks) */
-    var _prevSelected = CanvasV2State.getSelectedId();
-    try { CanvasV2State.selectElement(cv2Id); } catch (_) {}
-    /* v11.2.22: si veníamos de "nada seleccionado", el panel está en modo vacío
-       (botones deshabilitados) y el click posterior NO lo reconstruye porque el
-       estado ya coincide — reconstruirlo aquí una vez. */
-    if (_prevSelected === null && window.CanvasV2) {
-      try { window.CanvasV2.renderControls(cv2Id); } catch (_) {}
-    }
+    /* Update selection state (no HTML rebuild — click handler does that for pure clicks).
+       v11.2.31 (missclick): en TÁCTIL sobre un elemento NO seleccionado
+       (_drag.touchNoDrag) ya no se selecciona aquí en pointerdown — si el gesto
+       resulta ser un swipe de scroll, seleccionar era un missclick. El evento
+       `click` (que el navegador solo dispara si fue un tap de verdad, sin pan)
+       hace la selección por la vía normal del delegado. */
+    if (!_drag.touchNoDrag) {
+      var _prevSelected = CanvasV2State.getSelectedId();
+      try { CanvasV2State.selectElement(cv2Id); } catch (_) {}
+      /* v11.2.22: si veníamos de "nada seleccionado", el panel está en modo vacío
+         (botones deshabilitados) y el click posterior NO lo reconstruye porque el
+         estado ya coincide — reconstruirlo aquí una vez. */
+      if (_prevSelected === null && window.CanvasV2) {
+        try { window.CanvasV2.renderControls(cv2Id); } catch (_) {}
+      }
 
-    /* Immediate visual: apply is-selected class directly without full HTML rebuild */
-    try {
-      var prevSel = document.querySelector('.cv2-item.is-selected');
-      if (prevSel) prevSel.classList.remove('is-selected');
-      var selItem = document.getElementById('cv2-item-' + cv2Id);
-      if (selItem) selItem.classList.add('is-selected');
-    } catch (_) {}
+      /* Immediate visual: apply is-selected class directly without full HTML rebuild */
+      try {
+        var prevSel = document.querySelector('.cv2-item.is-selected');
+        if (prevSel) prevSel.classList.remove('is-selected');
+        var selItem = document.getElementById('cv2-item-' + cv2Id);
+        if (selItem) selItem.classList.add('is-selected');
+      } catch (_) {}
+    }
 
     /* v11.2.6: DO NOT capture the pointer here. Capturing on pointerdown
        retargets click/dblclick to #canvas-v2-preview, which broke double-click
