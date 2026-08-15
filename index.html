@@ -8603,6 +8603,8 @@ var CanvasV2State = (function () {
       layerUp:          'Atrás',
       layerDown:        'Adelante',
       /* actions */
+      undoLbl:          'Deshacer',
+      redoLbl:          'Rehacer',
       show:             'Mostrar',
       hide:             'Ocultar',
       duplicate:        'Duplicar',
@@ -8671,6 +8673,8 @@ var CanvasV2State = (function () {
       lineWidth:        'Width',
       layerUp:          'Back',
       layerDown:        'Forward',
+      undoLbl:          'Undo',
+      redoLbl:          'Redo',
       show:             'Show',
       hide:             'Hide',
       duplicate:        'Duplicate',
@@ -9298,6 +9302,8 @@ var CanvasV2UI = (function () {
     line:  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="4" y1="12" x2="20" y2="12"/></svg>',
     circle:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="8"/></svg>',
     frame: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="6" width="16" height="12" rx="1.5"/></svg>',
+    undo:  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-3"/></svg>',
+    redo:  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 14 5-5-5-5"/><path d="M20 9H10a6 6 0 0 0 0 12h3"/></svg>',
     dup:   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="8.5" y="8.5" width="11" height="11" rx="2"/><path d="M5 15.5V6a2 2 0 0 1 2-2h8.5"/></svg>',
     fwd:   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M6 11l6-6 6 6"/></svg>',
     back:  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M6 13l6 6 6-6"/></svg>',
@@ -9417,6 +9423,10 @@ var CanvasV2UI = (function () {
             'data-cv2-action="toggle-add-tray" aria-expanded="' + (_addTrayOpen ? 'true' : 'false') + '" ' +
             'aria-controls="cv2-add-tray"' + (tbCanAdd ? '' : ' disabled') + ' title="' + _esc(CanvasV2State.ui('sectionAdd')) + '">' +
             _CV_ICONS.plus + '<span class="cv2-tool-label">' + _esc(CanvasV2State.ui('sectionAdd')) + '</span></button>',
+          '<span class="cv2-tool-div-v"></span>',
+          /* v11.2.33: deshacer/rehacer */
+          _tool('history-undo', 'undo', CanvasV2State.ui('undoLbl'), '', !(window.CanvasV2History && CanvasV2History.canUndo())),
+          _tool('history-redo', 'redo', CanvasV2State.ui('redoLbl'), '', !(window.CanvasV2History && CanvasV2History.canRedo())),
           '<span class="cv2-tool-div-v"></span>',
           _tool('duplicate-selected', 'dup',  CanvasV2State.ui('duplicate'), '', !hasSel),
           _tool('bring-forward',      'fwd',  CanvasV2State.ui('forward'),   '', !tbCanFwd),
@@ -10132,6 +10142,8 @@ var CanvasV2UI = (function () {
           if (window.CanvasV2Designs) CanvasV2Designs.handleAction(action, actionBtn.dataset.cv2Design);
           return;
         }
+        if (action === 'history-undo')        { if (window.CanvasV2History) CanvasV2History.undo(); return; }
+        if (action === 'history-redo')        { if (window.CanvasV2History) CanvasV2History.redo(); return; }
         if (action === 'toggle-add-tray')     { toggleAddTray(); return; }
         else if (action === 'add-text')         { closeAddTray(); if (window.CanvasV2) window.CanvasV2.addElement('text');   }
         else if (action === 'add-star')         { closeAddTray(); if (window.CanvasV2) window.CanvasV2.addElement('star');   }
@@ -13781,6 +13793,174 @@ var CanvasV2Designs = (function () {
   };
   window.CanvasV2Designs = api;
   console.info('[CanvasV2D] v11.2.32 designs module loaded');
+  return api;
+})();
+
+
+
+/* ── src/modules/canvas-v2/canvas-v2-history.js ── */
+/* ═══════════════════════════════════════════════════════════════
+   CANVAS V2 — DESHACER / REHACER (v11.2.33)
+
+   Cómo funciona:
+   - Envuelve CanvasV2Persistence.saveNow (todas las mutaciones del
+     canvas pasan por ahí vía _save). Tras cada guardado, con un
+     debounce de 350ms, compara el snapshot actual con el último
+     conocido (_last): si cambió, empuja _last a la pila de undo.
+     Así una ráfaga (drag, escribir texto) = UN paso de historial.
+   - undo/redo restauran con CanvasV2Designs.restoreSnapshot (el
+     restaurador completo: quita dinámicos sobrantes, orden exacto,
+     selección segura) con _suppress para no auto-grabarse.
+   - Cambiar/crear/borrar diseño (reasons "design-*") resetea el
+     historial (cada diseño tiene su propia línea temporal de sesión;
+     el historial NO se persiste — es por sesión, como en Figma web).
+   - Teclado: Cmd/Ctrl+Z deshace, Shift+Cmd/Ctrl+Z (o Ctrl+Y) rehace,
+     solo con la vista canvas activa y sin foco en inputs.
+   - Botones ↶ ↷ en la barra del panel (ui.js), acciones
+     "history-undo"/"history-redo".
+   ═══════════════════════════════════════════════════════════════ */
+
+var CanvasV2History = (function () {
+  'use strict';
+
+  var MAX_STEPS = 50;
+  var DEBOUNCE_MS = 350;
+
+  var _undo = [];
+  var _redo = [];
+  var _last = null;      /* snapshot del último estado "consolidado" */
+  var _timer = null;
+  var _suppress = false; /* true mientras aplicamos un undo/redo */
+
+  function _snap() {
+    try { return CanvasV2Persistence.getSnapshot(); } catch (_) { return null; }
+  }
+  function _same(a, b) {
+    try { return JSON.stringify(a) === JSON.stringify(b); } catch (_) { return false; }
+  }
+
+  function canUndo() { return _undo.length > 0; }
+  function canRedo() { return _redo.length > 0; }
+
+  function updateButtons() {
+    try {
+      var u = document.querySelector('[data-cv2-action="history-undo"]');
+      var r = document.querySelector('[data-cv2-action="history-redo"]');
+      if (u) u.disabled = !canUndo();
+      if (r) r.disabled = !canRedo();
+    } catch (_) {}
+  }
+
+  function reset() {
+    _undo = []; _redo = [];
+    clearTimeout(_timer); _timer = null;
+    _last = _snap();
+    updateButtons();
+  }
+
+  /* llamado por el wrapper tras CADA saveNow */
+  function _afterSave(reason) {
+    if (_suppress) return;
+    var r = String(reason || '');
+    if (r.indexOf('design-') === 0) { reset(); return; } /* cambio de diseño */
+    clearTimeout(_timer);
+    _timer = setTimeout(function () {
+      var cur = _snap();
+      if (!cur || !_last) { _last = cur; return; }
+      if (_same(cur, _last)) return;
+      _undo.push(_last);
+      if (_undo.length > MAX_STEPS) _undo.shift();
+      _redo = [];
+      _last = cur;
+      updateButtons();
+    }, DEBOUNCE_MS);
+  }
+
+  function _applySnap(snap, reasonTag) {
+    _suppress = true;
+    try {
+      CanvasV2Designs.restoreSnapshot(snap);
+      _last = snap;
+      CanvasV2.renderControls(CanvasV2State.getSelectedId());
+      CanvasV2.renderPreview(reasonTag);
+      try { CanvasV2Persistence.saveNow(reasonTag); } catch (_) {}
+    } finally {
+      _suppress = false;
+    }
+    updateButtons();
+    try { if (window.AppModules && AppModules.Haptics) AppModules.Haptics.tap(); } catch (_) {}
+  }
+
+  function undo() {
+    /* si hay una ráfaga pendiente de consolidar, consolídala ya */
+    if (_timer) { clearTimeout(_timer); _timer = null;
+      var cur0 = _snap();
+      if (cur0 && _last && !_same(cur0, _last)) { _undo.push(_last); _last = cur0; _redo = []; }
+    }
+    if (!canUndo()) return false;
+    var cur = _snap();
+    var prev = _undo.pop();
+    if (cur) _redo.push(cur);
+    _applySnap(prev, 'undo-apply');
+    return true;
+  }
+
+  function redo() {
+    if (!canRedo()) return false;
+    var cur = _snap();
+    var next = _redo.pop();
+    if (cur) _undo.push(cur);
+    _applySnap(next, 'redo-apply');
+    return true;
+  }
+
+  /* ── instalación ── */
+
+  function _install() {
+    if (!window.CanvasV2Persistence || !window.CanvasV2Designs) {
+      console.warn('[CanvasV2H] persistence/designs no listos — history no instalado');
+      return;
+    }
+    /* interceptar TODOS los guardados del canvas */
+    var _origSaveNow = CanvasV2Persistence.saveNow;
+    CanvasV2Persistence.saveNow = function (reason) {
+      var out = _origSaveNow.apply(this, arguments);
+      try { _afterSave(reason); } catch (_) {}
+      return out;
+    };
+
+    /* teclado: Cmd/Ctrl+Z, Shift+Cmd/Ctrl+Z, Ctrl+Y */
+    document.addEventListener('keydown', function (e) {
+      if (!(e.metaKey || e.ctrlKey)) return;
+      var k = String(e.key || '').toLowerCase();
+      if (k !== 'z' && k !== 'y') return;
+      var view = document.getElementById('view-canvas');
+      if (!view || !view.classList.contains('active')) return;
+      var t = e.target;
+      var typing = t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable);
+      if (typing) return; /* el undo nativo del campo manda */
+      try { if (window.CanvasV2 && CanvasV2.isEditingText && CanvasV2.isEditingText()) return; } catch (_) {}
+      e.preventDefault();
+      if (k === 'y' || e.shiftKey) redo(); else undo();
+    }, true);
+
+    /* línea base tras el restore de arranque */
+    _last = _snap();
+    console.info('[CanvasV2H] v11.2.33 history instalado');
+  }
+
+  if (window.CanvasV2Persistence) _install();
+  else console.warn('[CanvasV2H] CanvasV2Persistence no encontrado al cargar');
+
+  var api = {
+    undo: undo,
+    redo: redo,
+    canUndo: canUndo,
+    canRedo: canRedo,
+    reset: reset,
+    updateButtons: updateButtons
+  };
+  window.CanvasV2History = api;
   return api;
 })();
 
