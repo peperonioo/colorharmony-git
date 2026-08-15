@@ -9396,6 +9396,13 @@ var CanvasV2UI = (function () {
     var tbCanFwd= hasSel && tbIdx < tbOrder.length - 1;
     var tbCanBwd= hasSel && tbIdx > 0;
     var tbIsVis = (function(){ var e = CanvasV2State.getElement(selId); return !e || e.visible !== false; })();
+    /* ── v11.2.32: Mis diseños (el módulo se carga después de ui.js;
+       en el primer paint aún no existe y la sección aparece en el
+       siguiente rebuild — siempre hay uno al montar la persistencia) ── */
+    if (window.CanvasV2Designs) {
+      try { parts.push(CanvasV2Designs.sectionHTML()); } catch (_) {}
+    }
+
     /* v11.2.31: los 5 botones de añadir viven en un cuadro desplegable
        tras un único botón "+ Añadir" (menos ruido, más dinamismo). */
     function _addCard(action, icon, label) {
@@ -10120,6 +10127,11 @@ var CanvasV2UI = (function () {
       if (actionBtn) {
         var action = actionBtn.dataset.cv2Action;
 
+        if (action && action.indexOf('design-') === 0) {
+          /* v11.2.32: Mis diseños */
+          if (window.CanvasV2Designs) CanvasV2Designs.handleAction(action, actionBtn.dataset.cv2Design);
+          return;
+        }
         if (action === 'toggle-add-tray')     { toggleAddTray(); return; }
         else if (action === 'add-text')         { closeAddTray(); if (window.CanvasV2) window.CanvasV2.addElement('text');   }
         else if (action === 'add-star')         { closeAddTray(); if (window.CanvasV2) window.CanvasV2.addElement('star');   }
@@ -13456,6 +13468,320 @@ var CanvasV2Export = (function () {
 
   console.info('[CanvasV2P] v11.1.5 canvas-v2-persistence.js loaded');
 
+})();
+
+
+
+/* ── src/modules/canvas-v2/canvas-v2-designs.js ── */
+/* ═══════════════════════════════════════════════════════════════
+   CANVAS V2 — MIS DISEÑOS (v11.2.32)
+   Varios pósters guardados. El salto de "un juguete con un póster"
+   a "una herramienta con tu biblioteca de diseños".
+
+   Arquitectura (mínima disrupción):
+   - El snapshot por ámbito de canvas-v2-persistence (global / por
+     perfil) SIGUE siendo la única fuente del contenido del diseño
+     ACTIVO — el autosave existente no cambia.
+   - Este módulo añade un registro `canvasV2Designs[scopeKey]`:
+       { active: id, order: [ids], items: { id: {id,name,snap,updatedAt} } }
+     donde `snap` solo se rellena para diseños INACTIVOS (el activo
+     vive en el autosave). Al cambiar de diseño: se guarda el actual
+     → snap del item viejo; se restaura el snap del nuevo.
+   - Regla de oro anti-clobber (v11.2.15): localStorage-FIRST +
+     AppState._patch para que AppStorage.save() no lo pise.
+
+   UI: sección "Diseños" al inicio del panel del canvas (chips +
+   acciones), rutas data-cv2-action="design-*" despachadas desde la
+   delegación de canvas-v2-ui.js hacia CanvasV2Designs.handleAction.
+   ═══════════════════════════════════════════════════════════════ */
+
+var CanvasV2Designs = (function () {
+  'use strict';
+
+  var LS_KEY = 'colorWheelApp_v1';
+  var MAX_DESIGNS = 12;
+
+  function _lang() { try { return CanvasV2State.getLang(); } catch (_) { return 'es'; } }
+  var T = {
+    es: { section: 'Diseños', nuevo: '＋ Nuevo', dup: 'Duplicar', ren: 'Renombrar', del: 'Borrar',
+          defName: 'Diseño', copia: ' (copia)', promptName: 'Nombre del diseño:',
+          confirmDel: function (n) { return '¿Borrar el diseño "' + n + '"? Esto no se puede deshacer.'; },
+          maxed: 'Máximo ' + MAX_DESIGNS + ' diseños.' },
+    en: { section: 'Designs', nuevo: '＋ New', dup: 'Duplicate', ren: 'Rename', del: 'Delete',
+          defName: 'Design', copia: ' (copy)', promptName: 'Design name:',
+          confirmDel: function (n) { return 'Delete the design "' + n + '"? This cannot be undone.'; },
+          maxed: 'Maximum ' + MAX_DESIGNS + ' designs.' }
+  };
+  function t(k) { var d = T[_lang()] || T.es; return d[k]; }
+
+  /* ── almacenamiento (localStorage-first + AppState) ── */
+
+  function _scopeKey() {
+    try {
+      var s = CanvasV2Persistence.getScope();
+      return s.type === 'profile' ? 'p:' + s.profileId : 'global';
+    } catch (_) { return 'global'; }
+  }
+
+  function _readLS() {
+    try { var raw = localStorage.getItem(LS_KEY); return raw ? (JSON.parse(raw) || {}) : {}; }
+    catch (_) { return {}; }
+  }
+
+  function _readAll() {
+    var v1 = _readLS();
+    return (v1.canvasV2Designs && typeof v1.canvasV2Designs === 'object') ? v1.canvasV2Designs : {};
+  }
+
+  function _writeAll(all) {
+    /* Paso 1: localStorage primero */
+    try {
+      var v1 = _readLS();
+      v1.canvasV2Designs = all;
+      localStorage.setItem(LS_KEY, JSON.stringify(v1));
+    } catch (_) {}
+    /* Paso 2: espejo en AppState → sobrevive a AppStorage.save() */
+    try { AppState._patch({ canvasV2Designs: all }); } catch (_) {}
+  }
+
+  function _reg() {
+    var all = _readAll();
+    var key = _scopeKey();
+    var r = all[key];
+    if (!r || !r.items || !r.active || !r.items[r.active]) {
+      /* primer uso en este ámbito → el contenido actual pasa a ser "Diseño 1" */
+      var id = 'd' + Date.now();
+      r = { active: id, order: [id], items: {} };
+      r.items[id] = { id: id, name: t('defName') + ' 1', snap: null, updatedAt: Date.now() };
+      all[key] = r;
+      _writeAll(all);
+    }
+    return r;
+  }
+
+  function _saveReg(r) {
+    var all = _readAll();
+    all[_scopeKey()] = r;
+    _writeAll(all);
+  }
+
+  /* ── restauración COMPLETA de un snapshot (a diferencia de
+        applySnapshot, elimina los elementos dinámicos sobrantes y
+        fuerza el orden exacto) — también la usa Undo (v11.2.33) ── */
+  function restoreSnapshot(snap) {
+    if (!snap || !snap.elements) return false;
+    try {
+      var wanted = {};
+      (snap.elementOrder || []).forEach(function (id) { wanted[id] = true; });
+      /* fuera los dinámicos que el snapshot no conoce */
+      var order = CanvasV2State.getElementOrder();
+      for (var i = order.length - 1; i >= 0; i--) {
+        var id = order[i];
+        if (!wanted[id] && !CanvasV2State.isDefaultElement(id)) CanvasV2State.removeElement(id);
+      }
+      CanvasV2Persistence.applySnapshot(snap);
+      /* orden exacto (applySnapshot no reordena los existentes) */
+      if (Array.isArray(snap.elementOrder) && snap.elementOrder.length) {
+        var valid = snap.elementOrder.filter(function (id) { return !!CanvasV2State.getElement(id); });
+        CanvasV2State.getState().elementOrder = valid;
+      }
+      /* selección segura */
+      var sel = CanvasV2State.getSelectedId();
+      if (sel && !CanvasV2State.getElement(sel)) CanvasV2State.selectElement('title');
+      return true;
+    } catch (e) {
+      console.warn('[CanvasV2D] restoreSnapshot error:', e);
+      return false;
+    }
+  }
+
+  function _rerender() {
+    try {
+      CanvasV2.renderControls(CanvasV2State.getSelectedId());
+      CanvasV2.renderPreview('designs');
+    } catch (_) {}
+  }
+
+  /* ── API ── */
+
+  function list() {
+    var r = _reg();
+    return r.order.filter(function (id) { return !!r.items[id]; })
+      .map(function (id) { return { id: id, name: r.items[id].name, active: id === r.active }; });
+  }
+
+  function activeId() { return _reg().active; }
+
+  function _stashActive(r) {
+    /* guarda el contenido vivo en el item activo (para poder salir de él) */
+    try { r.items[r.active].snap = CanvasV2Persistence.getSnapshot(); r.items[r.active].updatedAt = Date.now(); } catch (_) {}
+  }
+
+  function switchTo(id) {
+    var r = _reg();
+    if (!r.items[id] || id === r.active) return false;
+    try { CanvasV2Persistence.saveNow('design-switch-out'); } catch (_) {}
+    _stashActive(r);
+    var target = r.items[id];
+    if (target.snap) restoreSnapshot(target.snap);
+    r.active = id;
+    target.snap = null; /* su contenido vive ahora en el autosave */
+    _saveReg(r);
+    try { CanvasV2Persistence.saveNow('design-switch-in'); } catch (_) {}
+    _rerender();
+    try { if (window.AppModules && AppModules.Haptics) AppModules.Haptics.select(); } catch (_) {}
+    return true;
+  }
+
+  function create() {
+    var r = _reg();
+    if (r.order.length >= MAX_DESIGNS) { try { alert(t('maxed')); } catch (_) {} return null; }
+    try { CanvasV2Persistence.saveNow('design-new-out'); } catch (_) {}
+    _stashActive(r);
+    var id = 'd' + Date.now();
+    r.items[id] = { id: id, name: t('defName') + ' ' + (r.order.length + 1), snap: null, updatedAt: Date.now() };
+    r.order.push(id);
+    r.active = id;
+    _saveReg(r);
+    try { CanvasV2State.resetCanvas(); } catch (_) {}
+    try { CanvasV2Persistence.saveNow('design-new-in'); } catch (_) {}
+    _rerender();
+    return id;
+  }
+
+  function duplicate() {
+    var r = _reg();
+    if (r.order.length >= MAX_DESIGNS) { try { alert(t('maxed')); } catch (_) {} return null; }
+    var cur = r.items[r.active];
+    var id = 'd' + Date.now();
+    var snapCopy = null;
+    try { snapCopy = CanvasV2Persistence.getSnapshot(); } catch (_) {}
+    _stashActive(r);
+    r.items[id] = { id: id, name: cur.name + t('copia'), snap: null, updatedAt: Date.now() };
+    r.order.push(id);
+    r.active = id; /* la copia queda activa; su contenido = el actual (ya vivo) */
+    _saveReg(r);
+    try { CanvasV2Persistence.saveNow('design-dup'); } catch (_) {}
+    _rerender();
+    return id;
+  }
+
+  function rename() {
+    var r = _reg();
+    var cur = r.items[r.active];
+    var name = null;
+    try { name = window.prompt(t('promptName'), cur.name); } catch (_) {}
+    if (!name || !String(name).trim()) return false;
+    cur.name = String(name).trim().slice(0, 40);
+    cur.updatedAt = Date.now();
+    _saveReg(r);
+    _rerender();
+    return true;
+  }
+
+  function removeActive() {
+    var r = _reg();
+    if (r.order.length <= 1) return false; /* siempre queda al menos uno */
+    var cur = r.items[r.active];
+    var ok = false;
+    try { ok = window.confirm(t('confirmDel')(cur.name)); } catch (_) {}
+    if (!ok) return false;
+    var idx = r.order.indexOf(r.active);
+    delete r.items[r.active];
+    r.order.splice(idx, 1);
+    var nextId = r.order[Math.max(0, idx - 1)];
+    r.active = nextId;
+    var next = r.items[nextId];
+    if (next.snap) restoreSnapshot(next.snap);
+    next.snap = null;
+    _saveReg(r);
+    try { CanvasV2Persistence.saveNow('design-delete'); } catch (_) {}
+    _rerender();
+    return true;
+  }
+
+  /* ── UI: sección del panel (la inserta canvas-v2-ui.js) ── */
+
+  function _esc(s) {
+    return String(s == null ? '' : s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+
+  function sectionHTML() {
+    var r = _reg();
+    var chips = r.order.map(function (id) {
+      var it = r.items[id]; if (!it) return '';
+      var on = id === r.active;
+      return '<button type="button" class="cv2-design-chip' + (on ? ' cv2-design-on' : '') + '" ' +
+        'data-cv2-action="design-switch" data-cv2-design="' + id + '">' + _esc(it.name) + '</button>';
+    }).join('');
+    var canDel = r.order.length > 1;
+    return (
+      '<div class="cv2-sec">' +
+        '<div class="cv2-sec-title">' + _esc(t('section')) + '</div>' +
+        '<div class="cv2-design-chips">' + chips +
+          '<button type="button" class="cv2-design-chip cv2-design-new" data-cv2-action="design-new">' + _esc(t('nuevo')) + '</button>' +
+        '</div>' +
+        '<div class="cv2-design-actions">' +
+          '<button type="button" class="cv2-design-mini" data-cv2-action="design-dup">' + _esc(t('dup')) + '</button>' +
+          '<button type="button" class="cv2-design-mini" data-cv2-action="design-rename">✎ ' + _esc(t('ren')) + '</button>' +
+          '<button type="button" class="cv2-design-mini cv2-design-danger" data-cv2-action="design-del"' + (canDel ? '' : ' disabled') + '>' + _esc(t('del')) + '</button>' +
+        '</div>' +
+      '</div>'
+    );
+  }
+
+  function handleAction(action, designId) {
+    if (action === 'design-switch') switchTo(designId);
+    else if (action === 'design-new') create();
+    else if (action === 'design-dup') duplicate();
+    else if (action === 'design-rename') rename();
+    else if (action === 'design-del') removeActive();
+  }
+
+  function _injectCSS() {
+    if (document.getElementById('cv2-designs-css')) return;
+    var s = document.createElement('style');
+    s.id = 'cv2-designs-css';
+    s.textContent = [
+      '.cv2-design-chips{display:flex;flex-wrap:wrap;gap:6px;}',
+      '.cv2-design-chip{padding:7px 12px;border:1px solid var(--line);border-radius:999px;',
+      '  background:var(--bg-soft);color:var(--ink-dim);cursor:pointer;touch-action:manipulation;',
+      "  font-family:'JetBrains Mono',monospace;font-size:8.5px;letter-spacing:.08em;text-transform:uppercase;",
+      '  transition:border-color .16s var(--ease-yin),color .16s var(--ease-yin);}',
+      '.cv2-design-chip:active{transform:scale(.96);}',
+      '.cv2-design-on{color:var(--accent);border-color:color-mix(in srgb,var(--accent) 55%,var(--line));',
+      '  background:color-mix(in srgb,var(--accent) 8%,var(--bg-soft));}',
+      '.cv2-design-new{color:var(--accent);border-style:dashed;}',
+      '@media(pointer:fine){.cv2-design-chip:not(.cv2-design-on):hover{border-color:color-mix(in srgb,var(--accent) 40%,var(--line));color:var(--ink);}}',
+      '.cv2-design-actions{display:flex;gap:6px;margin-top:7px;}',
+      '.cv2-design-mini{flex:1;padding:7px 6px;border:1px solid var(--line);border-radius:9px;',
+      '  background:transparent;color:var(--ink-dim);cursor:pointer;touch-action:manipulation;',
+      "  font-family:'JetBrains Mono',monospace;font-size:7.5px;letter-spacing:.08em;text-transform:uppercase;}",
+      '.cv2-design-mini:active{background:rgba(255,255,255,.06);}',
+      '.cv2-design-mini:disabled{opacity:.3;cursor:not-allowed;}',
+      '.cv2-design-danger{color:rgba(239,83,80,.8);border-color:rgba(239,83,80,.25);}'
+    ].join('\n');
+    document.head.appendChild(s);
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', _injectCSS, { once: true });
+  else _injectCSS();
+
+  var api = {
+    list: list,
+    activeId: activeId,
+    switchTo: switchTo,
+    create: create,
+    duplicate: duplicate,
+    rename: rename,
+    removeActive: removeActive,
+    restoreSnapshot: restoreSnapshot,
+    sectionHTML: sectionHTML,
+    handleAction: handleAction
+  };
+  window.CanvasV2Designs = api;
+  console.info('[CanvasV2D] v11.2.32 designs module loaded');
+  return api;
 })();
 
 

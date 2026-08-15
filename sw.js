@@ -9,7 +9,7 @@
 */
 'use strict';
 
-var CACHE_VERSION = 'ac-v11.2.31';
+var CACHE_VERSION = 'ac-v11.2.32';
 var CACHE_NAME    = 'armonia-' + CACHE_VERSION;
 
 /* App shell mínimo a pre-cachear (rutas relativas al scope ./). */
