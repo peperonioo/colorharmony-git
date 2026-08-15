@@ -8287,7 +8287,7 @@ var CanvasV2State = (function () {
       /* v11.2.27: círculo/marco pueden ser grandes (fondos, bordes de póster).
          v11.2.29: texto hasta 320 (los títulos chocaban con el tope enseguida)
          — MISMO límite que los gestos de pinch/resize, antes inconsistente. */
-      var maxSz = (el.shape === 'circle' || el.shape === 'frame') ? 900
+      var maxSz = (el.shape === 'circle' || el.shape === 'frame' || el.type === 'image') ? 900
                 : (el.type === 'text') ? 320 : 240;
       el.size = Math.max(1, Math.min(maxSz, +patch.size || 1));
     }
@@ -8298,6 +8298,9 @@ var CanvasV2State = (function () {
     if (patch.uppercase !== undefined) el.uppercase = !!patch.uppercase;
     if (patch.weight    !== undefined) el.weight    = Math.max(100, Math.min(900, +patch.weight || 400));
     if (patch.font      !== undefined) el.font      = String(patch.font);
+    /* v11.2.34: elemento imagen */
+    if (patch.src       !== undefined) el.src       = String(patch.src);
+    if (patch.ratio     !== undefined) el.ratio     = Math.max(0.05, Math.min(20, +patch.ratio || 1));
   }
 
   function resetElement(id) {
@@ -8566,6 +8569,7 @@ var CanvasV2State = (function () {
       addLine2:         'Línea',
       addCircle2:       'Círculo',
       addFrame2:        'Marco',
+      addImage2:        'Logo',
       forward:          'Adelante',
       backward:         'Atrás',
       sectionElement:   'Elemento',
@@ -8642,6 +8646,7 @@ var CanvasV2State = (function () {
       addLine2:         'Line',
       addCircle2:       'Circle',
       addFrame2:        'Frame',
+      addImage2:        'Logo',
       forward:          'Forward',
       backward:         'Back',
       sectionElement:   'Element',
@@ -9174,6 +9179,9 @@ var CanvasV2UI = (function () {
       '.cv2-item.cv2-shape-circle{border-radius:50%;transform:translateX(-50%) translateY(-50%);}',
       '.cv2-item.cv2-shape-frame{transform:translateX(-50%) translateY(-50%);border-radius:2px;' +
         'background:transparent;box-sizing:border-box;}',
+      /* v11.2.34: imagen/logo */
+      '.cv2-item.cv2-shape-image{transform:translateX(-50%) translateY(-50%);' +
+        'background-size:contain;background-repeat:no-repeat;background-position:center;}',
 
       /* ── Disabled button state — v11.2.2a ── */
       '.cv2-btn:disabled,.cv2-btn-sm:disabled{opacity:.32;cursor:not-allowed;}',
@@ -9302,6 +9310,7 @@ var CanvasV2UI = (function () {
     line:  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="4" y1="12" x2="20" y2="12"/></svg>',
     circle:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="8"/></svg>',
     frame: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="6" width="16" height="12" rx="1.5"/></svg>',
+    image: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"/><circle cx="9.2" cy="9.2" r="1.6"/><path d="m5 18 5-5 3.5 3.5L16 14l4 4"/></svg>',
     undo:  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-3"/></svg>',
     redo:  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 14 5-5-5-5"/><path d="M20 9H10a6 6 0 0 0 0 12h3"/></svg>',
     dup:   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="8.5" y="8.5" width="11" height="11" rx="2"/><path d="M5 15.5V6a2 2 0 0 1 2-2h8.5"/></svg>',
@@ -9440,6 +9449,7 @@ var CanvasV2UI = (function () {
           _addCard('add-line',   'line',   CanvasV2State.ui('addLine2')),
           _addCard('add-circle', 'circle', CanvasV2State.ui('addCircle2')),
           _addCard('add-frame',  'frame',  CanvasV2State.ui('addFrame2')),
+          _addCard('add-image',  'image',  CanvasV2State.ui('addImage2')),
         '</div>',
       '</div>'
     );
@@ -9786,6 +9796,14 @@ var CanvasV2UI = (function () {
       styleProps.push('background:' + colors.b);
       inner = handle;
 
+    } else if (el.type === 'image') {
+      /* v11.2.34: logo/imagen — size = ancho (px@720), alto por ratio guardado */
+      classes.push('cv2-shape-image');
+      styleProps.push('width:'  + CanvasV2State.sizeToCss(el.size));
+      styleProps.push('height:' + CanvasV2State.sizeToCss(el.size / (el.ratio || 1)));
+      if (el.src) styleProps.push("background-image:url('" + el.src + "')");
+      inner = handle;
+
     } else if (el.type === 'shape' && el.shape === 'frame') {
       /* v11.2.26: marco rectangular — width% × size de alto, borde 2@720 */
       classes.push('cv2-shape-frame');
@@ -9999,6 +10017,45 @@ var CanvasV2UI = (function () {
     });
   }
 
+  /* v11.2.34: elegir imagen/logo → reescalar a máx 600px → dataURL → elemento.
+     PNG conserva transparencia (logos); lo demás va a JPEG 0.85 (fotos, pesa menos). */
+  function _pickImage() {
+    var inp = document.createElement('input');
+    inp.type = 'file';
+    inp.accept = 'image/*';
+    inp.style.display = 'none';
+    inp.addEventListener('change', function () {
+      var f = inp.files && inp.files[0];
+      try { document.body.removeChild(inp); } catch (_) {}
+      if (!f) return;
+      var isPng = (f.type === 'image/png' || f.type === 'image/svg+xml' || f.type === 'image/webp');
+      var url = URL.createObjectURL(f);
+      var img = new Image();
+      img.onload = function () {
+        try {
+          var MAX = 600;
+          var w = img.naturalWidth || 1, h = img.naturalHeight || 1;
+          var k = Math.min(1, MAX / Math.max(w, h));
+          var cw = Math.max(1, Math.round(w * k)), ch = Math.max(1, Math.round(h * k));
+          var cv = document.createElement('canvas');
+          cv.width = cw; cv.height = ch;
+          cv.getContext('2d').drawImage(img, 0, 0, cw, ch);
+          var dataURL = isPng ? cv.toDataURL('image/png') : cv.toDataURL('image/jpeg', 0.85);
+          URL.revokeObjectURL(url);
+          if (dataURL.length > 1200000) {
+            /* demasiado pesado para localStorage — re-intenta como JPEG más comprimido */
+            dataURL = cv.toDataURL('image/jpeg', 0.7);
+          }
+          if (window.CanvasV2 && CanvasV2.addImageElement) CanvasV2.addImageElement(dataURL, w / h);
+        } catch (e) { console.warn('[CanvasV2UI] error procesando imagen:', e); }
+      };
+      img.onerror = function () { URL.revokeObjectURL(url); };
+      img.src = url;
+    }, { once: true });
+    document.body.appendChild(inp);
+    inp.click();
+  }
+
   function installDelegation(root, handlers) {
     if (root.dataset.cv2Delegated) return;
     root.dataset.cv2Delegated = '1';
@@ -10150,6 +10207,7 @@ var CanvasV2UI = (function () {
         else if (action === 'add-line')         { closeAddTray(); if (window.CanvasV2) window.CanvasV2.addElement('line');   }
         else if (action === 'add-circle')       { closeAddTray(); if (window.CanvasV2) window.CanvasV2.addElement('circle'); }
         else if (action === 'add-frame')        { closeAddTray(); if (window.CanvasV2) window.CanvasV2.addElement('frame');  }
+        else if (action === 'add-image')        { closeAddTray(); _pickImage(); }
         else if (action === 'duplicate-selected')  { if (window.CanvasV2) window.CanvasV2.duplicateSelected();        }
         else if (action === 'delete-selected')  { if (window.CanvasV2) window.CanvasV2.deleteSelected();          }
         else if (action === 'bring-forward')    { if (window.CanvasV2) window.CanvasV2.bringSelectedForward();    }
@@ -11315,8 +11373,8 @@ var CanvasV2UI = (function () {
     _pinch.lastPinchStart = new Date().toISOString();
     if (isText)                              { _pinch.szMin = 6;  _pinch.szMax = 320; } /* v11.2.29 */
     else if (isShape && el.shape === 'line') { _pinch.szMin = 1;  _pinch.szMax = 8;   }
-    else if (isShape && (el.shape === 'circle' || el.shape === 'frame'))
-                                             { _pinch.szMin = 10; _pinch.szMax = 900; } /* v11.2.26/27 */
+    else if ((isShape && (el.shape === 'circle' || el.shape === 'frame')) || el.type === 'image')
+                                             { _pinch.szMin = 10; _pinch.szMax = 900; } /* v11.2.26/27/34 */
     else                                     { _pinch.szMin = 10; _pinch.szMax = 80;  }
     _activeMode = 'pinch';
     _cacheGesture(selId); /* v11.2.18: cache rect + el + controls ONCE */
@@ -11467,7 +11525,7 @@ var CanvasV2UI = (function () {
     var szMin, szMax;
     if (isText)             { szMin = 6;  szMax = 320; } /* v11.2.29 */
     else if (isShape && el.shape === 'line') { szMin = 1; szMax = 8; }
-    else if (isShape && (el.shape === 'circle' || el.shape === 'frame')) { szMin = 10; szMax = 900; } /* v11.2.26/27 */
+    else if ((isShape && (el.shape === 'circle' || el.shape === 'frame')) || el.type === 'image') { szMin = 10; szMax = 900; } /* v11.2.26/27/34 */
     else                    { szMin = 10; szMax = 80;  }
 
     _resize.active    = false;
@@ -11780,6 +11838,31 @@ var CanvasV2UI = (function () {
         try { if (window.AppModules && AppModules.Haptics) AppModules.Haptics.tap(); } catch(_){}
         console.info('[CanvasV2] added', kind, '→', id);
       } catch (e) { _lastActionOk = false; _lastActionError = String(e); console.warn('[CanvasV2] addElement failed', e); }
+    },
+
+    /* ── addImageElement(src, ratio) — v11.2.34: logo/imagen en el póster ── */
+    addImageElement: function (src, ratio) {
+      if (!src) return;
+      var order = CanvasV2State.getElementOrder();
+      if (order.length >= 20) { console.warn('[CanvasV2] addImageElement: max 20 elements'); return; }
+      var id, n;
+      for (n = 1; n <= 30; n++) { id = 'imageNew' + n; if (!CanvasV2State.getElement(id)) break; }
+      var config = { id: id, type: 'image', label: { es: 'Logo', en: 'Logo' },
+        x: 50, y: 50, size: 200, ratio: Math.max(0.05, Math.min(20, +ratio || 1)),
+        src: String(src), visible: true, opacity: 1 };
+      _lastAction = 'addImageElement';
+      try {
+        var ok = CanvasV2State.addElement(id, config);
+        if (!ok) { _lastActionOk = false; return; }
+        CanvasV2State.selectElement(id);
+        CanvasV2.renderControls(id);
+        CanvasV2.renderPreview();
+        _lastControlEvent = Date.now();
+        _save('addImageElement:' + id);
+        _lastActionOk = true;
+        try { if (window.AppModules && AppModules.Haptics) AppModules.Haptics.tap(); } catch (_) {}
+        console.info('[CanvasV2] imagen añadida →', id, 'ratio', config.ratio);
+      } catch (e) { _lastActionOk = false; _lastActionError = String(e); console.warn('[CanvasV2] addImageElement failed', e); }
     },
 
     /* ── setFormat(key) — v11.2.24: post / square / story ──
@@ -12556,6 +12639,19 @@ var CanvasV2Export = (function () {
     ctx.globalAlpha = 1;
   }
 
+  /* v11.2.34: logo/imagen — mismo encuadre que el DOM (caja size × size/ratio,
+     centrada en x,y; el alto sigue el ratio real → drawImage llena la caja). */
+  function _drawImage(ctx, el, W, H, scale, img) {
+    if (!img) return;
+    var w = (el.size || 200) * scale;
+    var h = w / (el.ratio || 1);
+    var cx = (el.x / 100) * W;
+    var cy = (el.y / 100) * H;
+    ctx.globalAlpha = (el.opacity != null ? el.opacity : 1);
+    try { ctx.drawImage(img, cx - w / 2, cy - h / 2, w, h); } catch (_) {}
+    ctx.globalAlpha = 1;
+  }
+
   function _drawLine(ctx, el, W, H, scale, ink) {
     var w = ((el.width || 16) / 100) * W;
     var h = (el.size || 2) * scale;
@@ -12586,7 +12682,21 @@ var CanvasV2Export = (function () {
     var els = order.map(function (id) { return CanvasV2State.getElement(id); })
                    .filter(function (el) { return el && el.visible !== false; });
 
-    return _loadFonts(els).then(function () {
+    /* v11.2.34: precargar las imágenes (logos) de los elementos type:image */
+    var imgJobs = els.filter(function (el) { return el.type === 'image' && el.src; })
+      .map(function (el) {
+        return new Promise(function (resolve) {
+          var im = new Image();
+          im.onload = function () { resolve({ el: el, img: im }); };
+          im.onerror = function () { resolve(null); };
+          im.src = el.src;
+        });
+      });
+
+    return Promise.all([_loadFonts(els), Promise.all(imgJobs)]).then(function (res) {
+      var imgMap = {};
+      (res[1] || []).forEach(function (r) { if (r) imgMap[r.el.id || r.el.src] = r.img; });
+
       var cv = document.createElement('canvas');
       cv.width = W; cv.height = H;
       var ctx = cv.getContext('2d');
@@ -12598,6 +12708,7 @@ var CanvasV2Export = (function () {
       /* elementos en orden de capa (elementOrder = z-order del DOM) */
       els.forEach(function (el) {
         if (el.type === 'text')                            _drawText(ctx, el, W, H, scale, colors.b);
+        else if (el.type === 'image')                        _drawImage(ctx, el, W, H, scale, imgMap[el.id || el.src]);
         else if (el.type === 'shape' && el.shape === 'star') _drawStar(ctx, el, W, H, scale, colors.b);
         else if (el.type === 'shape' && el.shape === 'line') _drawLine(ctx, el, W, H, scale, colors.b);
         else if (el.type === 'shape' && el.shape === 'circle') _drawCircle(ctx, el, W, H, scale, colors.b);
@@ -12717,10 +12828,10 @@ var CanvasV2Export = (function () {
   var STATUS_TTL_MS = 4000;
 
   /* Element fields serialized per element */
-  var NUMERIC_FIELDS = ['x','y','size','width','opacity'];
+  var NUMERIC_FIELDS = ['x','y','size','width','opacity','ratio'];
   var INT_FIELDS     = ['weight'];
   var BOOL_FIELDS    = ['visible','uppercase'];
-  var STR_FIELDS     = ['text','align','font','shape'];
+  var STR_FIELDS     = ['text','align','font','shape','src']; /* v11.2.34: +src (imagen) */
 
   /* ─────────────────────────────────────────────
      PRIVATE STATE
