@@ -1136,6 +1136,18 @@ html[data-gesture="wheel"] body,html[data-mobile-lock="wheel"] body{overflow:hid
 .identity-tour{position:fixed;inset:0;z-index:980;display:none;pointer-events:none;background:transparent!important;}
 .identity-tour.active{display:block;}
 .identity-tour-card{position:fixed;right:14px;top:calc(env(safe-area-inset-top,0px) + 118px);width:min(228px,calc(100vw - 28px));transform:none;border:1px solid var(--line);border-radius:18px;padding:11px;background:color-mix(in srgb,var(--bg-card) 88%,transparent);box-shadow:0 14px 42px rgba(0,0,0,.30),inset 0 1px 0 rgba(255,255,255,.07);backdrop-filter:blur(16px) saturate(135%);-webkit-backdrop-filter:blur(16px) saturate(135%);pointer-events:auto;}
+/* v11.2.35: vibras del onboarding wow */
+.identity-tour-actions{flex-wrap:wrap;}
+.identity-tour-vibes{display:flex;gap:7px;margin:0 0 9px;width:100%;}
+.identity-tour-vibe{flex:1;display:flex;flex-direction:column;align-items:center;gap:6px;padding:11px 4px;border:1px solid var(--line);border-radius:13px;background:var(--bg-soft);cursor:pointer;transition:border-color .16s var(--ease-yin),transform .12s var(--ease-yin);}
+.identity-tour-vibe:active{transform:scale(.95);}
+.identity-tour-vibe:hover{border-color:color-mix(in srgb,var(--accent) 50%,var(--line));}
+.itv-dots{display:flex;gap:4px;}
+.itv-dot{width:15px;height:15px;border-radius:50%;border:1px solid rgba(255,255,255,.25);display:block;}
+.itv-label{font-family:'JetBrains Mono',monospace;font-size:7.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink);}
+.cv2-export-attn{animation:cv2ExportAttn 1.15s ease-in-out 3;}
+@keyframes cv2ExportAttn{0%,100%{transform:scale(1);}50%{transform:scale(1.045);}}
+@media(prefers-reduced-motion: reduce){.cv2-export-attn{animation:none;}}
 .identity-tour-kicker{font-family:'JetBrains Mono',monospace;font-size:8px;letter-spacing:.18em;text-transform:uppercase;color:var(--accent);margin-bottom:6px;}
 .identity-tour-title{font-family:'Fraunces',serif;font-size:17px;line-height:1.05;color:var(--ink);margin:0 0 6px;font-style:italic;}
 .identity-tour-copy{font-size:10.8px;line-height:1.36;color:var(--ink-dim);margin:0 0 9px;}
@@ -6828,7 +6840,9 @@ setTimeout(setupProfileAnalyser,80);
   const copy={
     es:{
       skip:'Saltar', next:'Siguiente', back:'Atrás', begin:'Empezar',
-      s1k:'Bienvenido', s1t:'Armonía de Color', s1c:'Encuentra combinaciones de color que funcionan, compáralas y diseña tu póster — todo en un solo lugar.',
+      s1k:'Bienvenido', s1t:'Armonía de Color', s1c:'Elige una vibra y llévate un póster con tus colores en un minuto — o explora a tu aire.',
+      vibeE:'Elegante', vibeF:'Fiesta', vibeM:'Minimal',
+      vibeReady:'✨ Tu póster está listo — edita el texto y pulsa Descargar', tour:'Ver cómo funciona',
       s2k:'Paso 1 · Rueda', s2t:'Elige tus colores', s2c:'Toca o arrastra en la rueda para elegir un color. La app resalta al instante combinaciones que armonizan: complementarios y análogos.',
       s3k:'Paso 2 · Canvas', s3t:'Diseña tu póster', s3c:'En la pestaña Canvas, haz doble clic en un texto para editarlo, arrástralo y cambia su tamaño. Tus colores se aplican solos.',
       s4k:'Paso 3 · Perfiles', s4t:'Crea tu perfil', s4c:'Elige los colores de tu proyecto o marca —o arrastra una imagen y te recomendaremos colores que armonicen. Guarda las paletas que más te gusten; todo se guarda solo en tu navegador.',
@@ -6836,7 +6850,9 @@ setTimeout(setupProfileAnalyser,80);
     },
     en:{
       skip:'Skip', next:'Next', back:'Back', begin:'Start',
-      s1k:'Welcome', s1t:'Color Harmony', s1c:'Find color combinations that work, compare them and design your poster — all in one place.',
+      s1k:'Welcome', s1t:'Color Harmony', s1c:'Pick a vibe and walk away with a poster in your colors in one minute — or explore on your own.',
+      vibeE:'Elegant', vibeF:'Party', vibeM:'Minimal',
+      vibeReady:'✨ Your poster is ready — edit the text and hit Download', tour:'See how it works',
       s2k:'Step 1 · Wheel', s2t:'Pick your colors', s2c:'Tap or drag on the wheel to pick a color. The app instantly highlights combinations that harmonize: complementary and analogous.',
       s3k:'Step 2 · Canvas', s3t:'Design your poster', s3c:'In the Canvas tab, double-click a text to edit it, drag it and resize it. Your colors apply automatically.',
       s4k:'Step 3 · Profiles', s4t:'Create your profile', s4c:'Pick your project or brand colors —or drag in an image and we will recommend colors that harmonize. Save the palettes you like best; everything saves automatically in your browser.',
@@ -6849,9 +6865,9 @@ setTimeout(setupProfileAnalyser,80);
   function hasOwnProfiles(){return profiles().some(p=>!p.core);}
   function getSlot(slot){return safe(()=>window.ACPublicAPI&&ACPublicAPI.slots.get(slot),null);}
   function setActiveSlot(slot){safe(()=>window.ACPublicAPI&&ACPublicAPI.slots.setActive(slot),null);}
-  function showToast(msg){
+  function showToast(msg,ms){
     if(!toastEl){toastEl=document.createElement('div');toastEl.className='identity-tour-toast';document.body.appendChild(toastEl);}
-    toastEl.textContent=msg;toastEl.classList.add('show');clearTimeout(showToast._t);showToast._t=setTimeout(()=>toastEl.classList.remove('show'),900);
+    toastEl.textContent=msg;toastEl.classList.add('show');clearTimeout(showToast._t);showToast._t=setTimeout(()=>toastEl.classList.remove('show'),ms||900);
   }
   function ensureOverlay(){
     if(overlay)return overlay;
@@ -6905,7 +6921,13 @@ setTimeout(setupProfileAnalyser,80);
     B.skip='<button class="identity-tour-btn ghost" data-tour="skip">'+t('skip')+'</button>';
     let html='';
     if(step==='intro')html=card(t('s1k'),t('s1t'),t('s1c'),
-      '<button class="identity-tour-btn primary" data-tour="next">'+t('begin')+'</button>'+B.skip,'intro');
+      /* v11.2.35: "wow" — 3 vibras que dejan un póster listo en el canvas */
+      '<div class="identity-tour-vibes">'+
+        vibeBtn('elegante', t('vibeE'))+
+        vibeBtn('fiesta',   t('vibeF'))+
+        vibeBtn('minimal',  t('vibeM'))+
+      '</div>'+
+      '<button class="identity-tour-btn ghost" data-tour="next">'+t('tour')+'</button>'+B.skip,'intro');
     if(step==='wheel') html=card(t('s2k'),t('s2t'),t('s2c'), B.back+B.next+B.skip,'wheel');
     if(step==='canvas')html=card(t('s3k'),t('s3t'),t('s3c'), B.back+B.next+B.skip,'canvas');
     if(step==='save')  html=card(t('s4k'),t('s4t'),t('s4c'),
@@ -6961,6 +6983,44 @@ setTimeout(setupProfileAnalyser,80);
     },680);
   }
   function finish(){hide(true);safe(()=>$('#btn-compare')?.click(),null);}
+  /* ── v11.2.35: vibras — del primer tap a un póster listo ── */
+  const VIBES={
+    elegante:{a:'#12121E',b:'#D4AF37',tmpl:'framed-invite'},
+    fiesta:  {a:'#1B0533',b:'#FF3D7F',tmpl:'bold-club-poster'},
+    minimal: {a:'#F2EFE9',b:'#16161C',tmpl:'minimal-editorial'}
+  };
+  function vibeBtn(key,label){
+    const v=VIBES[key];
+    return '<button class="identity-tour-vibe" data-tour-vibe="'+key+'">'+
+      '<span class="itv-dots"><span class="itv-dot" style="background:'+v.a+'"></span>'+
+      '<span class="itv-dot" style="background:'+v.b+'"></span></span>'+
+      '<span class="itv-label">'+label+'</span></button>';
+  }
+  function applyVibe(key){
+    const v=VIBES[key]; if(!v)return;
+    safe(()=>AppActions.setColorA({hex:v.a,name:'Vibe A',exact:true}),null);
+    safe(()=>AppActions.setColorB({hex:v.b,name:'Vibe B',exact:true}),null);
+    hide(true);
+    safe(()=>$('#btn-canvas')?.click(),null);
+    /* aplicar la plantilla cuando la vista canvas ya está montada */
+    setTimeout(()=>{
+      safe(()=>window.CanvasV2&&CanvasV2.applyTemplate(v.tmpl),null);
+      safe(()=>window.CanvasV2&&CanvasV2.deselect&&CanvasV2.deselect(),null);
+      showToast(t('vibeReady'),3200);
+      /* señalar el botón Descargar (pulso 3 ciclos, respeta reduced-motion vía CSS).
+         Reintenta: el primer montado de la vista canvas puede tardar un frame más. */
+      let attnTries=0;
+      const armAttn=()=>{
+        const dl=document.getElementById('cv2-export-download');
+        if(dl){dl.classList.add('cv2-export-attn');
+          setTimeout(()=>dl.classList.remove('cv2-export-attn'),4000);
+          safe(()=>dl.scrollIntoView({behavior:'smooth',block:'center'}),null);
+        }else if(++attnTries<12){setTimeout(armAttn,200);}
+      };
+      setTimeout(armAttn,350);
+    },420);
+  }
+
   function bindButtons(){
     overlay?.querySelectorAll('[data-tour]').forEach(btn=>btn.addEventListener('click',()=>{
       const a=btn.dataset.tour;
@@ -6970,6 +7030,7 @@ setTimeout(setupProfileAnalyser,80);
       else if(a==='create'){hide(true);openProfiles();}
       else if(a==='finish')finish();
     }));
+    overlay?.querySelectorAll('[data-tour-vibe]').forEach(btn=>btn.addEventListener('click',()=>applyVibe(btn.dataset.tourVibe)));
   }
   function onColorPreview(){
     if(!overlay||!overlay.classList.contains('active'))return;
