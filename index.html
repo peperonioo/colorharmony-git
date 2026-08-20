@@ -560,20 +560,39 @@ h1 em{font-weight:800;font-style:normal;color:var(--accent);}
   border:1px solid var(--line);border-radius:14px;overflow:hidden;background:var(--bg-soft);
   box-shadow:0 8px 24px rgba(0,0,0,.12);
 }
-.predominant-square{height:92px;display:flex;align-items:flex-end;justify-content:flex-end;padding:8px;}
+/* v11.2.36: la muestra ES el control — A a la izquierda, HEX (copiable) en medio, B a la derecha */
+.predominant-square{height:96px;display:flex;align-items:center;justify-content:space-between;gap:4px;padding:7px;}
 .predominant-code{
-  font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:.08em;
-  color:#fff;background:rgba(0,0,0,.48);border:1px solid rgba(255,255,255,.16);
-  padding:4px 6px;border-radius:999px;text-shadow:0 1px 4px rgba(0,0,0,.35);
+  font-family:'JetBrains Mono',monospace;font-size:8px;letter-spacing:.02em;font-weight:600;
+  color:#fff;background:rgba(0,0,0,.46);border:1px solid rgba(255,255,255,.18);
+  padding:6px 5px;border-radius:999px;text-shadow:0 1px 4px rgba(0,0,0,.35);
+  cursor:pointer;touch-action:manipulation;white-space:nowrap;
+  /* debe poder encogerse: si no, empujaba el botón B fuera de la tarjeta */
+  flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;
+  transition:background .18s var(--ease-yin),transform .12s var(--ease-yin),color .18s var(--ease-yin);
 }
+.predominant-code:hover{background:rgba(0,0,0,.66);}
+.predominant-code:active{transform:scale(.94);}
+.predominant-code.is-copied{background:var(--accent);color:#0a0a0f;border-color:var(--accent);text-shadow:none;}
+.predominant-side{
+  width:27px;height:27px;flex:0 0 27px;border-radius:50%;cursor:pointer;touch-action:manipulation;
+  font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:700;line-height:1;
+  color:#fff;background:rgba(0,0,0,.42);border:1px solid rgba(255,255,255,.28);
+  display:flex;align-items:center;justify-content:center;
+  transition:background .18s var(--ease-yin),transform .12s var(--ease-yin),border-color .18s var(--ease-yin);
+}
+.predominant-side:hover{background:rgba(0,0,0,.68);border-color:rgba(255,255,255,.6);}
+.predominant-side:active{transform:scale(.9);}
+/* muestras claras → controles en tinta oscura para que se lean */
+.predominant-square.on-light .predominant-side{color:#0a0a0f;background:rgba(255,255,255,.55);border-color:rgba(0,0,0,.24);}
+.predominant-square.on-light .predominant-side:hover{background:rgba(255,255,255,.85);}
+.predominant-square.on-light .predominant-code{color:#0a0a0f;background:rgba(255,255,255,.62);border-color:rgba(0,0,0,.18);text-shadow:none;}
+.predominant-square.on-light .predominant-code:hover{background:rgba(255,255,255,.88);}
+/* asignado a A/B → dorado, se ve de un vistazo cuál está en cada slot */
+.predominant-side.is-picked{background:var(--accent);border-color:var(--accent);color:#0a0a0f;box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 28%,transparent);}
 .predominant-meta{padding:9px 10px;}
 .predominant-name{font-family:'Fraunces',serif;font-size:15px;font-style:italic;line-height:1.1;}
 .predominant-pop{font-family:'JetBrains Mono',monospace;font-size:8px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-dim);margin-top:3px;}
-/* v11.2.10: assign a detected color to slot A or B */
-.predominant-pick{display:flex;gap:6px;padding:0 10px 10px;}
-.predominant-pick-btn{flex:1;font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.1em;font-weight:600;padding:7px 0;border-radius:9px;border:1px solid var(--line);background:var(--bg-card);color:var(--ink);cursor:pointer;transition:all .18s var(--ease-yin);}
-.predominant-pick-btn:hover{border-color:var(--accent);color:var(--accent);}
-.predominant-pick-btn.is-picked{background:var(--accent);border-color:var(--accent);color:#0a0a0f;}
 .analysis-suggestions{
   display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px;margin-top:10px;
 }
@@ -4643,48 +4662,178 @@ function colorDistance(a,b){
   const dr=a.r-b.r,dg=a.g-b.g,db=a.b-b.b;
   return Math.sqrt(dr*dr*0.3+dg*dg*0.59+db*db*0.11);
 }
+
+/* ══════════════════════════════════════════════════════════════
+   v11.2.36 — MOTOR DE EXTRACCIÓN DE COLOR (reescrito)
+
+   Por qué el anterior fallaba ("no coge los colores que debería"):
+     1. Agrupaba en RGB con una distancia luma-ponderada (0.3/0.59/0.11)
+        → dos azules muy distintos salían "casi iguales"; los verdes se
+        separaban de más. La agrupación no era perceptual.
+     2. Sembraba los centros recorriendo los píxeles EN ORDEN DE ESCANEO
+        (pts[i*step]) → si la mitad superior es cielo, varios centros
+        arrancaban en el mismo azul y el resto de la imagen se perdía.
+     3. Ordenaba SOLO por población → en una foto ganan siempre el gris de
+        pared, el beige y la sombra; el color con carácter (el que un
+        diseñador quiere) quedaba fuera.
+     4. Devolvía la MEDIA del grupo → un color promedio, lavado, que a
+        menudo NO existe en la imagen.
+
+   Cómo funciona ahora:
+     • Histograma de 5 bits/canal (rápido y sin sesgo de muestreo) que
+       guarda además el color exacto medio de cada celda.
+     • Todo el trabajo en OKLab: distancias perceptuales de verdad.
+     • Siembra k-means++ determinista (máx. n·D²) → centros repartidos
+       por TODA la gama de la imagen, resultado reproducible.
+     • Representante = color REAL de la imagen (la celda más frecuente
+       cerca del centro), nunca un promedio inventado.
+     • Ranking = población^0.55 × (0.28 + 0.72·viveza) → los colores con
+       carácter compiten con los neutros dominantes en vez de perder siempre.
+     • El color MÁS dominante siempre va primero (es el fondo natural del
+       póster) y el resto se eligen exigiendo distancia perceptual mínima.
+   ══════════════════════════════════════════════════════════════ */
+
+function _srgbToLinear(c){c/=255;return c<=0.04045?c/12.92:Math.pow((c+0.055)/1.055,2.4);}
+function rgbToOklab(r,g,b){
+  const R=_srgbToLinear(r),G=_srgbToLinear(g),B=_srgbToLinear(b);
+  const l=Math.cbrt(0.4122214708*R+0.5363325363*G+0.0514459929*B);
+  const m=Math.cbrt(0.2119034982*R+0.6806995451*G+0.1073969566*B);
+  const s=Math.cbrt(0.0883024619*R+0.2817188376*G+0.6299787005*B);
+  return{L:0.2104542553*l+0.7936177850*m-0.0040720468*s,
+         a:1.9779984951*l-2.4285922050*m+0.4505937099*s,
+         b:0.0259040371*l+0.7827717662*m-0.8086757660*s};
+}
+function oklabDE(p,q){
+  const dL=p.L-q.L,da=p.a-q.a,db=p.b-q.b;
+  return Math.sqrt(dL*dL+da*da+db*db);
+}
+/* v11.2.36: ¿la muestra es clara? → los controles A/B y el HEX van en tinta oscura. */
+function _isLightHex(hex){
+  try{const c=hexToRgb(hex);return rgbToOklab(c.r,c.g,c.b).L>0.72;}catch(_){return false;}
+}
+
 function extractPaletteFromImage(img,count=6){
-  const max=180;
-  const ratio=Math.min(1,max/img.naturalWidth,max/img.naturalHeight);
-  const w=Math.max(1,Math.round(img.naturalWidth*ratio));
-  const h=Math.max(1,Math.round(img.naturalHeight*ratio));
+  const MAXD=260;
+  const nw=img.naturalWidth||img.width||1, nh=img.naturalHeight||img.height||1;
+  const ratio=Math.min(1,MAXD/nw,MAXD/nh);
+  const w=Math.max(1,Math.round(nw*ratio)), h=Math.max(1,Math.round(nh*ratio));
   const cnv=document.createElement('canvas');
   cnv.width=w;cnv.height=h;
   const ctx=cnv.getContext('2d',{willReadFrequently:true});
+  /* Reducir SIN interpolar: el suavizado promedia píxeles vecinos e INVENTA
+     colores de mezcla en cada borde (los típicos "barros" que ensuciaban la
+     paleta de un logo). Sin suavizado cada píxel analizado existe tal cual
+     en la imagen original. */
+  ctx.imageSmoothingEnabled=false;
+  try{ctx.webkitImageSmoothingEnabled=false;ctx.mozImageSmoothingEnabled=false;}catch(_){}
   ctx.drawImage(img,0,0,w,h);
   const data=ctx.getImageData(0,0,w,h).data;
-  const pts=[];
-  for(let i=0;i<data.length;i+=16){
-    const r=data[i],g=data[i+1],b=data[i+2],a=data[i+3];
-    if(a<220)continue;
-    const maxc=Math.max(r,g,b),minc=Math.min(r,g,b);
-    if(maxc<16||minc>244)continue; // skip near pure black/white noise
-    pts.push({r,g,b});
+
+  /* 1. Histograma 5 bits/canal — cada celda guarda cuántos píxeles tiene
+        y la suma de sus RGB exactos (para recuperar el color real). */
+  const BITS=5,SH=8-BITS;
+  const bins=new Map();
+  for(let i=0;i<data.length;i+=4){
+    if(data[i+3]<128)continue;                 /* transparente (logos PNG) */
+    const r=data[i],g=data[i+1],b=data[i+2];
+    const key=((r>>SH)<<(BITS*2))|((g>>SH)<<BITS)|(b>>SH);
+    let e=bins.get(key);
+    if(!e){e={n:0,rs:0,gs:0,bs:0};bins.set(key,e);}
+    e.n++;e.rs+=r;e.gs+=g;e.bs+=b;
   }
-  if(!pts.length)return [];
-  let centers=[];
-  const step=Math.max(1,Math.floor(pts.length/count));
-  for(let i=0;i<count;i++)centers.push({...pts[Math.min(pts.length-1,i*step)]});
-  for(let iter=0;iter<10;iter++){
-    const groups=centers.map(()=>({r:0,g:0,b:0,n:0}));
-    pts.forEach(p=>{
-      let bi=0,bd=Infinity;
-      centers.forEach((c,i)=>{const d=colorDistance(p,c);if(d<bd){bd=d;bi=i;}});
-      groups[bi].r+=p.r;groups[bi].g+=p.g;groups[bi].b+=p.b;groups[bi].n++;
-    });
-    centers=centers.map((c,i)=>groups[i].n?{r:groups[i].r/groups[i].n,g:groups[i].g/groups[i].n,b:groups[i].b/groups[i].n}:c);
+  if(!bins.size)return[];
+
+  /* 2. Celdas → puntos en OKLab (con su color real y su peso) */
+  const pts=[];let total=0;
+  bins.forEach(e=>{
+    const r=e.rs/e.n,g=e.gs/e.n,b=e.bs/e.n;
+    const lab=rgbToOklab(r,g,b);
+    pts.push({L:lab.L,a:lab.a,b:lab.b,C:Math.sqrt(lab.a*lab.a+lab.b*lab.b),n:e.n,hex:rgbToHex(r,g,b)});
+    total+=e.n;
+  });
+  if(pts.length<=count)
+    return pts.sort((x,y)=>y.n-x.n).map(p=>p.hex);
+
+  /* 3. Siembra k-means++ DETERMINISTA: el primer centro es el color más
+        frecuente; cada siguiente, el que maximiza peso × distancia² al
+        centro más cercano → cubre toda la gama, no solo lo dominante. */
+  const K=Math.min(Math.max(count*2,10),14,pts.length);
+  const centers=[];
+  let seed=pts[0];for(const p of pts)if(p.n>seed.n)seed=p;
+  centers.push({L:seed.L,a:seed.a,b:seed.b});
+  const dmin=pts.map(p=>oklabDE(p,centers[0]));
+  while(centers.length<K){
+    let best=-1,bi=-1;
+    for(let i=0;i<pts.length;i++){
+      const sc=pts[i].n*dmin[i]*dmin[i];
+      if(sc>best){best=sc;bi=i;}
+    }
+    if(bi<0||best<=0)break;
+    const c={L:pts[bi].L,a:pts[bi].a,b:pts[bi].b};
+    centers.push(c);
+    for(let i=0;i<pts.length;i++){const d=oklabDE(pts[i],c);if(d<dmin[i])dmin[i]=d;}
   }
-  const buckets=centers.map(c=>({hex:rgbToHex(c.r,c.g,c.b),rgb:{r:c.r,g:c.g,b:c.b},weight:0}));
-  pts.forEach(p=>{
-    let bi=0,bd=Infinity;
-    buckets.forEach((b,i)=>{const d=colorDistance(p,b.rgb);if(d<bd){bd=d;bi=i;}});
-    buckets[bi].weight++;
+
+  /* 4. k-means ponderado en OKLab */
+  const assign=new Array(pts.length).fill(0);
+  for(let iter=0;iter<14;iter++){
+    let moved=false;
+    for(let i=0;i<pts.length;i++){
+      let bd=Infinity,bj=0;
+      for(let j=0;j<centers.length;j++){const d=oklabDE(pts[i],centers[j]);if(d<bd){bd=d;bj=j;}}
+      if(assign[i]!==bj){assign[i]=bj;moved=true;}
+    }
+    const acc=centers.map(()=>({L:0,a:0,b:0,n:0}));
+    for(let i=0;i<pts.length;i++){
+      const g=acc[assign[i]],p=pts[i];
+      g.L+=p.L*p.n;g.a+=p.a*p.n;g.b+=p.b*p.n;g.n+=p.n;
+    }
+    for(let j=0;j<centers.length;j++){
+      if(acc[j].n){centers[j]={L:acc[j].L/acc[j].n,a:acc[j].a/acc[j].n,b:acc[j].b/acc[j].n};}
+    }
+    if(!moved&&iter>1)break;
+  }
+
+  /* 5. Cada grupo → un color REAL de la imagen (celda más frecuente cerca
+        del centro), con su peso y su viveza. */
+  const cands=[];
+  for(let j=0;j<centers.length;j++){
+    let pop=0,rep=null,repScore=-1,near=null,nearD=Infinity;
+    for(let i=0;i<pts.length;i++){
+      if(assign[i]!==j)continue;
+      const p=pts[i];pop+=p.n;
+      const d=oklabDE(p,centers[j]);
+      if(d<nearD){nearD=d;near=p;}
+      if(d<0.075&&p.n>repScore){repScore=p.n;rep=p;}
+    }
+    if(!pop)continue;
+    const r=rep||near;
+    if(!r)continue;
+    const share=pop/total;
+    const vivid=Math.min(1,r.C/0.14);
+    const edge=(r.L<0.10||r.L>0.95)?0.55:1;   /* casi negro/blanco: buen fondo, mal acento */
+    cands.push({hex:r.hex,lab:r,share:share,
+                score:Math.pow(share,0.55)*(0.28+0.72*vivid)*edge});
+  }
+  if(!cands.length)return[];
+
+  /* 6. Selección: primero el DOMINANTE real (fondo natural del póster),
+        luego por carácter, exigiendo distancia perceptual entre ellos. */
+  const out=[],chosen=[];
+  const byPop=cands.slice().sort((a,b)=>b.share-a.share);
+  out.push(byPop[0].hex);chosen.push(byPop[0].lab);
+  const rest=cands.filter(c=>c.hex!==byPop[0].hex).sort((a,b)=>b.score-a.score);
+  /* El suelo NO baja de 0.06: si la imagen solo tiene 4 colores de verdad,
+     devolvemos 4. Rellenar hasta 6 metía mezclas turbias de los bordes
+     (antialiasing) que ensucian la paleta y no las quiere nadie. */
+  [0.10,0.08,0.06].forEach(minDE=>{
+    for(const c of rest){
+      if(out.length>=count)return;
+      if(out.indexOf(c.hex)>=0)continue;
+      if(chosen.every(s=>oklabDE(c.lab,s)>=minDE)){out.push(c.hex);chosen.push(c.lab);}
+    }
   });
-  const unique=[];
-  buckets.sort((a,b)=>b.weight-a.weight).forEach(b=>{
-    if(!unique.some(u=>colorDistance(hexToRgb(u.hex),hexToRgb(b.hex))<34))unique.push(b);
-  });
-  return unique.slice(0,count).map(b=>b.hex);
+  return out.slice(0,count);
 }
 async function analyseImageSource(src,isFile){
   const status=document.getElementById('profile-analysis-status');
@@ -4731,12 +4880,20 @@ function renderProfileAnalysis(colors){
   const sug=document.getElementById('analysis-suggestions');
   if(!result||!grid||!sug)return;
   result.classList.add('open');
+  /* v11.2.36: A a la izquierda, B a la derecha y el HEX en medio (se copia al tocarlo).
+     Todo sobre la propia muestra: menos ruido y objetivos táctiles grandes. */
+  const _en=(localStorage.getItem('np_lang')==='en');
   grid.innerHTML=colors.map((c,i)=>{
     const name=getColorName(c);
+    const aLbl=_en?'Set as Color A':'Asignar a Color A';
+    const bLbl=_en?'Set as Color B':'Asignar a Color B';
     return '<div class="predominant-card" data-hex="'+c+'">'+
-      '<div class="predominant-square" style="background:'+c+'"><span class="predominant-code">'+c+'</span></div>'+
+      '<div class="predominant-square'+(_isLightHex(c)?' on-light':'')+'" style="background:'+c+'">'+
+        '<button type="button" class="predominant-side predominant-pick-btn" data-pick="a" data-hex="'+c+'" title="'+aLbl+'" aria-label="'+aLbl+'">A</button>'+
+        '<button type="button" class="predominant-code" data-copy="'+c+'" title="'+(_en?'Tap to copy':'Toca para copiar')+'">'+c+'</button>'+
+        '<button type="button" class="predominant-side predominant-pick-btn" data-pick="b" data-hex="'+c+'" title="'+bLbl+'" aria-label="'+bLbl+'">B</button>'+
+      '</div>'+
       '<div class="predominant-meta"><div class="predominant-name">'+(name.tech||name)+'</div><div class="predominant-pop">'+(name.popular||'Color '+(i+1))+'</div></div>'+
-      '<div class="predominant-pick"><button type="button" class="predominant-pick-btn" data-pick="a" data-hex="'+c+'">Color A</button><button type="button" class="predominant-pick-btn" data-pick="b" data-hex="'+c+'">Color B</button></div>'+
       '</div>';
   }).join('');
   const dominant=colors[0], accent=colors[1]||colors[0], support=colors[2]||colors[0];
@@ -4836,10 +4993,44 @@ function setupProfileAnalyser(){
     if(grid){grid.querySelectorAll('.predominant-pick-btn[data-pick="'+slot+'"]').forEach(b=>b.classList.toggle('is-picked',b.dataset.hex&&b.dataset.hex.toUpperCase()===hex));}
     const st=document.getElementById('profile-analysis-status'); if(st)st.textContent='Color '+slot.toUpperCase()+' = '+hex;
   }
+  /* v11.2.36: tocar el HEX lo copia al portapapeles (con feedback en el propio chip). */
+  function copyHex(btn){
+    const hex=btn.dataset.copy; if(!hex)return;
+    const en=(localStorage.getItem('np_lang')==='en');
+    const done=()=>{
+      if(btn.dataset.busy)return;
+      btn.dataset.busy='1';
+      const prev=btn.textContent;
+      btn.textContent=en?'COPIED ✓':'COPIADO ✓';
+      btn.classList.add('is-copied');
+      if(window.AppModules&&window.AppModules.Haptics)window.AppModules.Haptics.select();
+      setTimeout(()=>{btn.textContent=prev;btn.classList.remove('is-copied');delete btn.dataset.busy;},1200);
+    };
+    if(navigator.clipboard&&navigator.clipboard.writeText){
+      navigator.clipboard.writeText(hex).then(done).catch(()=>fallbackCopy(hex,done));
+    }else fallbackCopy(hex,done);
+  }
+  /* Respaldo sin Clipboard API (http, Safari viejo). Usa un <span> + Selection —
+     NUNCA un <textarea>: check.js prohíbe crearlos (bug del overlay de v11.2.3). */
+  function fallbackCopy(text,ok){
+    try{
+      const span=document.createElement('span');
+      span.textContent=text;
+      span.style.cssText='position:fixed;top:-1000px;left:-1000px;opacity:0;white-space:pre;user-select:text;';
+      document.body.appendChild(span);
+      const range=document.createRange();range.selectNodeContents(span);
+      const sel=window.getSelection();sel.removeAllRanges();sel.addRange(range);
+      const done=document.execCommand('copy');
+      sel.removeAllRanges();document.body.removeChild(span);
+      if(done)ok();
+    }catch(_){}
+  }
   const predGrid=document.getElementById('predominant-grid');
   if(predGrid&&!predGrid.dataset.pickBound){
     predGrid.dataset.pickBound='1';
     predGrid.addEventListener('click',e=>{
+      const cp=e.target.closest('.predominant-code');
+      if(cp){copyHex(cp);return;}
       const btn=e.target.closest('.predominant-pick-btn'); if(!btn)return;
       pickAnalysisColor(btn.dataset.pick,btn.dataset.hex);
     });
