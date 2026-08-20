@@ -4707,6 +4707,35 @@ function oklabDE(p,q){
   const dL=p.L-q.L,da=p.a-q.a,db=p.b-q.b;
   return Math.sqrt(dL*dL+da*da+db*db);
 }
+/* v11.2.39: inverso de OKLab → poder GENERAR colores en espacio perceptual.
+   oklchToHex(L,C,h): L 0..1, C croma (0..~0.37), h grados. Recorta a gama sRGB
+   bajando el croma hasta que entra (así un color pedido "imposible" no se
+   convierte en un bloque saturado y feo, sino en su versión más viva posible). */
+function oklchToHex(L,C,hDeg){
+  L=Math.max(0,Math.min(1,L));
+  const hr=(hDeg%360)*Math.PI/180;
+  function tryC(c){
+    const a=Math.cos(hr)*c, b=Math.sin(hr)*c;
+    const l_=L+0.3963377774*a+0.2158037573*b;
+    const m_=L-0.1055613458*a-0.0638541728*b;
+    const s_=L-0.0894841775*a-1.2914855480*b;
+    const l=l_*l_*l_, m=m_*m_*m_, s=s_*s_*s_;
+    const R= 4.0767416621*l-3.3077115913*m+0.2309699292*s;
+    const G=-1.2684380046*l+2.6097574011*m-0.3413193965*s;
+    const B=-0.0041960863*l-0.7034186147*m+1.7076147010*s;
+    return {R:R,G:G,B:B,inGamut:(R>=-0.001&&R<=1.001&&G>=-0.001&&G<=1.001&&B>=-0.001&&B<=1.001)};
+  }
+  let c=Math.max(0,C), out=tryC(c);
+  for(let i=0;i<24&&!out.inGamut;i++){c*=0.9;out=tryC(c);}
+  const f=v=>{v=Math.max(0,Math.min(1,v));return v<=0.0031308?12.92*v:1.055*Math.pow(v,1/2.4)-0.055;};
+  return rgbToHex(f(out.R)*255,f(out.G)*255,f(out.B)*255);
+}
+function hexToOklch(hex){
+  const c=hexToRgb(hex), lab=rgbToOklab(c.r,c.g,c.b);
+  let h=Math.atan2(lab.b,lab.a)*180/Math.PI; if(h<0)h+=360;
+  return {L:lab.L,C:Math.sqrt(lab.a*lab.a+lab.b*lab.b),h:h};
+}
+
 /* v11.2.36: ¿la muestra es clara? → los controles A/B y el HEX van en tinta oscura. */
 function _isLightHex(hex){
   try{const c=hexToRgb(hex);return rgbToOklab(c.r,c.g,c.b).L>0.72;}catch(_){return false;}
@@ -7534,32 +7563,177 @@ if ('serviceWorker' in navigator) {
     if(!prof && id){prof=profs.find(p=>String(p.name||'').toLowerCase().trim()===String(id).toLowerCase().trim());}
     return prof||null;
   }
-  function bOptionsFor(A,prof){
+  /* ═════════════════════════════════════════════════════════════
+     v11.2.39 — MOTOR DE SUGERENCIAS POR PERFIL (reescrito)
+
+     Qué fallaba antes:
+       1. Todo en HSL. En HSL "luminosidad 50%" es un amarillo casi blanco y
+          un azul casi negro → aplicar la L media del perfil a otro matiz daba
+          un color que NO se parecía en nada al perfil.
+       2. Promediaba S y L de TODA la paleta: un perfil con azul marino +
+          amarillo daba un barro medio que no representaba a ninguno.
+       3. TIRABA los matices del perfil: solo guardaba medias. Una marca con
+          un magenta propio recibía sugerencias que ignoraban ese magenta.
+       4. NO miraba el contraste. En el póster A es el fondo y B la tinta:
+          una sugerencia con ratio 1.4:1 es ilegible e inservible.
+       5. 7 recetas fijas con prioridades escritas a mano, siempre las mismas.
+
+     Cómo funciona ahora:
+       • Todo en OKLCH (perceptual): la L significa lo mismo en todos los matices.
+       • Huella del perfil: matices REALES agrupados y pesados, croma y
+         luminosidad típicas (mediana, no media → un color raro no la arrastra).
+       • Candidatos = armonías respecto a A **+ los propios matices del perfil**
+         (para que la marca se proponga a sí misma).
+       • La L de cada candidato se elige para CONTRASTAR con A (fondo→tinta),
+         partiendo de la L típica del perfil.
+       • Puntuación real: contraste (WCAG) + calidad de la armonía + afinidad
+         con el perfil + viveza. Se descarta lo ilegible (<2.5:1).
+       • Se eliminan casi-duplicados por distancia perceptual.
+     ═════════════════════════════════════════════════════════════ */
+  function _median(arr){
+    if(!arr.length)return 0;
+    const s=arr.slice().sort((a,b)=>a-b), m=s.length>>1;
+    return s.length%2?s[m]:(s[m-1]+s[m])/2;
+  }
+  function _profileFingerprint(prof){
     const pals=getPalsSafe().filter(p=>prof&&p.profId===prof.id);
     const hexes=pals.flatMap(p=>p.colors||[]).filter(Boolean);
-    const refs=hexes.map(hsl);
-    const base=hsl(A.hex);
-    const avgS=refs.length?refs.reduce((a,x)=>a+x.s,0)/refs.length:Math.max(72,base.s);
-    const avgL=refs.length?refs.reduce((a,x)=>a+x.l,0)/refs.length:Math.max(44,base.l);
-    const purpose=(prof&&prof.purpose)||'free';
-    const satBoost=purpose==='marketing'?1.08:purpose==='branding'?0.96:1;
-    const energyS=clamp((avgS*.62+base.s*.38)*satBoost,42,95);
-    const profileL=clamp(avgL*.74+base.l*.26,16,82);
-    const mk=(label,deg,sMul,lMul,why,priority)=>({
-      hex:toHex((base.h+deg+360)%360,clamp(energyS*sMul,36,96),clamp(profileL*lMul,12,88)),label,why,priority
+    const lch=[];
+    hexes.forEach(h=>{ try{ lch.push(hexToOklch(h)); }catch(_){} });
+    if(!lch.length)return null;
+    /* matices SOLO de los colores con croma real (un gris no tiene matiz útil) */
+    const chromatic=lch.filter(c=>c.C>0.035);
+    const hues=[];
+    chromatic.forEach(c=>{
+      const near=hues.find(g=>{
+        const d=Math.abs(g.h-c.h); return Math.min(d,360-d)<28;
+      });
+      if(near){ near.w+=1; near.h=(near.h*(near.w-1)+c.h)/near.w; }
+      else hues.push({h:c.h,w:1});
     });
+    hues.sort((a,b)=>b.w-a.w);
+    return {
+      hues:hues,
+      C:_median(chromatic.length?chromatic.map(c=>c.C):[0.09]),
+      L:_median(lch.map(c=>c.L)),
+      n:lch.length
+    };
+  }
+  function _hueDist(a,b){ const d=Math.abs(a-b)%360; return Math.min(d,360-d); }
+
+  function bOptionsFor(A,prof){
     const en=lang()==='en';
-    const opts=[
-      mk(en?'Primary complement':'Complementario principal',180,1,1,en?'Maximum contrast with the base hue.':'Contraste máximo con el matiz base.',100),
-      mk(en?'Warm split':'Split cálido',150,1.03,.94,en?'Energetic but less aggressive than a direct complement.':'Energético pero menos agresivo que el complemento directo.',92),
-      mk(en?'Cool split':'Split frío',210,1.03,1.06,en?'More editorial and balanced.':'Más editorial y equilibrado.',90),
-      mk(en?'Triad A':'Triada A',120,.96,1,en?'Expressive system color.':'Color de sistema expresivo.',84),
-      mk(en?'Triad B':'Triada B',240,.96,1,en?'Second triadic direction.':'Segunda dirección triádica.',82),
-      mk(en?'Bright analog':'Análogo brillante',30,.9,1.1,en?'Close family, lighter accent.':'Misma familia, acento más luminoso.',76),
-      mk(en?'Deep analog':'Análogo profundo',-30,.92,.86,en?'Close family, deeper accent.':'Misma familia, acento más profundo.',74)
+    let fp=null;
+    try{ fp=_profileFingerprint(prof); }catch(_){}
+    let base;
+    try{ base=hexToOklch(A.hex); }catch(_){ return []; }
+
+    /* Croma y luminosidad de referencia: del perfil si lo hay, si no del propio A */
+    const targetC=fp?Math.max(0.045,Math.min(0.30,fp.C)):Math.max(0.07,Math.min(0.28,base.C));
+    const profL  =fp?fp.L:base.L;
+    /* Franjas de luminosidad candidatas. Se generan tintas CLARAS y OSCURAS
+       según lo oscuro que sea A (y las dos si A es de tono medio), en vez de
+       forzar una sola L: forzarla dejaba fondos medios casi sin opciones y
+       fondos claros con propuestas casi negras y sin color.
+       Las L oscuras no bajan de 0.30 porque por debajo el recorte a gama sRGB
+       aplasta el croma y todo acaba en un barro negruzco. */
+    const bands=[];
+    if(base.L<0.64){ bands.push(0.86,0.74); }
+    if(base.L>0.40){ bands.push(0.42,0.32); }
+    if(!bands.length){ bands.push(0.84,0.34); }
+    /* Fondos de tono MEDIO: ninguna luminosidad intermedia llega a 4.5:1 contra
+       ellos, así que se añaden las dos que sí funcionan (casi blanco y casi
+       negro). Es lo que haría un diseñador: sobre un verde medio, texto blanco. */
+    if(base.L>0.40&&base.L<0.72){ bands.push(0.96,0.20); }
+    /* la luminosidad típica del perfil, si cae en una zona utilizable */
+    if(profL>0.30&&profL<0.90&&Math.abs(profL-base.L)>0.22) bands.push(profL);
+
+    const cands=[];
+    const push=(hex,label,why,harmony,askedC)=>{
+      if(!hex)return;
+      const k=hex.toUpperCase();
+      if(A&&A.hex&&k===A.hex.toUpperCase())return;
+      cands.push({hex:k,label:label,why:why,harmony:harmony,askedC:askedC||0});
+    };
+
+    /* a) Armonías respecto a A, vestidas con el croma/luz del perfil */
+    const REC=[
+      [180,en?'Primary complement':'Complementario principal',en?'Maximum contrast with the base hue.':'Contraste máximo con el matiz base.',1.00],
+      [150,en?'Warm split':'Split cálido',en?'Energetic but less aggressive than a direct complement.':'Energético pero menos agresivo que el complemento directo.',0.95],
+      [210,en?'Cool split':'Split frío',en?'More editorial and balanced.':'Más editorial y equilibrado.',0.95],
+      [120,en?'Triad A':'Triada A',en?'Expressive system color.':'Color de sistema expresivo.',0.88],
+      [240,en?'Triad B':'Triada B',en?'Second triadic direction.':'Segunda dirección triádica.',0.86],
+      [ 30,en?'Bright analog':'Análogo brillante',en?'Close family, lighter accent.':'Misma familia, acento más luminoso.',0.74],
+      [-30,en?'Deep analog':'Análogo profundo',en?'Close family, deeper accent.':'Misma familia, acento más profundo.',0.74]
     ];
-    const seen=new Set();
-    return opts.filter(o=>{const k=o.hex.toUpperCase(); if(A&&A.hex&&k===A.hex.toUpperCase())return false; if(seen.has(k))return false; seen.add(k); return true;}).slice(0,6);
+    REC.forEach(r=>{
+      const h=(base.h+r[0]+360)%360;
+      bands.forEach((L,bi)=>{
+        push(oklchToHex(L,targetC,h),r[1],r[2],r[3]*(bi===0?1:0.985),targetC);
+      });
+    });
+
+    /* b) LOS PROPIOS MATICES DEL PERFIL — para que la marca se proponga a sí misma */
+    if(fp&&fp.hues.length){
+      fp.hues.slice(0,3).forEach((g,i)=>{
+        const rel=_hueDist(g.h,base.h);
+        /* armonía razonable si NO está pegado al matiz de A (sería invisible) */
+        const harmony=rel<18?0.45:(rel>150?1.0:0.82);
+        const cc=Math.max(targetC,0.08);
+        bands.forEach(L=>{
+          push(oklchToHex(L,cc,g.h),
+               en?'Brand hue':'Matiz de la marca',
+               en?'A signature hue of this profile, re-lit to read over Color A.'
+                 :'Un matiz propio de este perfil, ajustado para leerse sobre el Color A.',
+               harmony-i*0.03, cc);
+        });
+      });
+    }
+
+    /* c) Puntuar: contraste real + armonía + afinidad con el perfil + viveza */
+    const scored=[];
+    cands.forEach(c=>{
+      let cr=1; try{ cr=contrast(A.hex,c.hex); }catch(_){}
+      if(cr<2.5)return;                                  /* ilegible como tinta */
+      const contrastScore=Math.min(1,(cr-2.5)/5.0);      /* 7.5:1 ya es tope */
+      let lch; try{ lch=hexToOklch(c.hex); }catch(_){ return; }
+      /* afinidad: ¿este matiz existe en el perfil? ¿el croma se parece? */
+      let hueAff=0.5;
+      if(fp&&fp.hues.length){
+        const best=Math.min.apply(null,fp.hues.map(g=>_hueDist(g.h,lch.h)));
+        hueAff=best<25?1:best<60?0.75:best<110?0.5:0.32;
+      }
+      const cAff=1-Math.min(1,Math.abs(lch.C-targetC)/0.22);
+      const vivid=Math.min(1,lch.C/0.13);
+      /* ¿el color pedido cabía en sRGB o se quedó sin croma? Un "azul" que al
+         recortar acaba en un negro azulado NO es una sugerencia útil: se penaliza
+         para que no gane a una opción que sí conserva su color. */
+      const keep=c.askedC>0?Math.min(1,lch.C/(c.askedC*0.85)):1;
+      const score=(c.harmony*0.32 + contrastScore*0.28 + hueAff*0.19 + cAff*0.07 + vivid*0.14)
+                  *(0.55+0.45*keep);
+      scored.push({hex:c.hex,label:c.label,why:c.why,score:score,cr:cr,lch:lch});
+    });
+    if(!scored.length)return [];
+    scored.sort((a,b)=>b.score-a.score);
+
+    /* d) Selección final: sin casi-duplicados (distancia perceptual) y
+          RESERVANDO 2 huecos para opciones realmente legibles (AA 4.5:1).
+          Si no, con fondos de tono medio ganaban siempre las más bonitas y
+          el usuario se quedaba sin ninguna que sirviera para texto. */
+    const out=[];
+    const dup=s=>out.some(o=>{
+      const dL=o.lch.L-s.lch.L, dC=o.lch.C-s.lch.C;
+      const dh=_hueDist(o.lch.h,s.lch.h)/180;
+      return Math.sqrt(dL*dL+dC*dC+dh*dh*0.25)<0.10;
+    });
+    scored.forEach(s=>{ if(out.length<2&&s.cr>=4.5&&!dup(s))out.push(s); });
+    scored.forEach(s=>{ if(out.length<6&&out.indexOf(s)<0&&!dup(s))out.push(s); });
+    out.sort((a,b)=>b.score-a.score);
+    return out.map(o=>({
+      hex:o.hex,label:o.label,
+      why:o.why+' ('+(en?'contrast ':'contraste ')+o.cr.toFixed(1)+':1)',
+      priority:Math.round(o.score*100)
+    }));
   }
 
   function renderColorBAdvisorV95(){
@@ -7633,7 +7807,15 @@ if ('serviceWorker' in navigator) {
     setInterval(stabilizeChrome,1800);
     setTimeout(()=>{const A=getSlot('a'),B=getSlot('b'); if(A&&B)renderCompareV95(); else if(A&&!B)renderColorBAdvisorV95();},240);
   }
-  window.ACStabilityV95={version:VERSION,applyLanguage:applyAuthoritativeLanguage,renderSmartMatch:renderCompareV95,renderColorBAdvisor:renderColorBAdvisorV95,applySuggestionToB:applySuggestionToBV95};
+  window.ACStabilityV95={version:VERSION,applyLanguage:applyAuthoritativeLanguage,renderSmartMatch:renderCompareV95,renderColorBAdvisor:renderColorBAdvisorV95,applySuggestionToB:applySuggestionToBV95,
+    /* v11.2.39: motor de sugerencias expuesto para diagnóstico y ajuste fino.
+       __sugDebug('#12121E') devuelve las opciones que propondría para ese Color A
+       con el perfil activo (sin tocar la UI). */
+    bOptionsFor:bOptionsFor, profileFingerprint:_profileFingerprint};
+  window.__sugDebug=function(aHex){
+    try{ return bOptionsFor({hex:String(aHex).toUpperCase()},profileForAdvisor()); }
+    catch(e){ return {error:String(e)}; }
+  };
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true}); else boot();
 })();
 
