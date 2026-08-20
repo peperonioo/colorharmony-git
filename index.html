@@ -8844,6 +8844,9 @@ var CanvasV2State = (function () {
       alignLeft:        'Izq',
       alignCenter:      'Centro',
       alignRight:       'Der',
+      alignTop:         'Arriba',
+      alignMiddle:      'Medio',
+      alignBottom:      'Abajo',
       /* shape */
       shape:            'Forma',
       /* position */
@@ -8919,6 +8922,9 @@ var CanvasV2State = (function () {
       alignLeft:        'Left',
       alignCenter:      'Center',
       alignRight:       'Right',
+      alignTop:         'Top',
+      alignMiddle:      'Middle',
+      alignBottom:      'Bottom',
       shape:            'Shape',
       posX:             'Pos X',
       posY:             'Pos Y',
@@ -9438,6 +9444,35 @@ var CanvasV2UI = (function () {
       /* ── Disabled button state — v11.2.2a ── */
       '.cv2-btn:disabled,.cv2-btn-sm:disabled{opacity:.32;cursor:not-allowed;}',
 
+      /* ── v11.2.38: barra flotante sobre la selección ── */
+      /* Sin transform: la posición se calcula en píxeles exactos desde JS
+         (con translateX(-50%) + animación el centro quedaba impredecible). */
+      '.cv2-floatbar{position:absolute;z-index:40;display:none;align-items:center;gap:2px;' +
+        'padding:4px;border-radius:12px;box-sizing:border-box;' +
+        'background:rgba(14,14,20,.92);border:1px solid rgba(255,255,255,.14);' +
+        'box-shadow:0 10px 30px rgba(0,0,0,.45);backdrop-filter:blur(10px);' +
+        '-webkit-backdrop-filter:blur(10px);animation:cv2FbIn .16s var(--ease-yin);}',
+      '@keyframes cv2FbIn{from{opacity:0;}to{opacity:1;}}',
+      '@media(prefers-reduced-motion: reduce){.cv2-floatbar{animation:none;}}',
+      '.cv2-fb-btn{width:30px;height:30px;display:flex;align-items:center;justify-content:center;' +
+        'border:0;border-radius:8px;background:transparent;color:rgba(255,255,255,.82);cursor:pointer;' +
+        'touch-action:manipulation;transition:background .14s var(--ease-yin),color .14s var(--ease-yin);}',
+      '.cv2-fb-btn svg{width:15px;height:15px;}',
+      '.cv2-fb-btn:active{transform:scale(.9);}',
+      '@media(pointer:fine){.cv2-fb-btn:hover{background:rgba(255,255,255,.13);color:#fff;}}',
+      '.cv2-fb-div{width:1px;height:17px;background:rgba(255,255,255,.16);margin:0 2px;}',
+      /* mientras se arrastra la barra estorba → se oculta */
+      '#cv2-artboard.cv2-dragging .cv2-floatbar{display:none!important;}',
+
+      /* ── v11.2.38: alinear al lienzo ── */
+      '.cv2-pagealign{display:flex;gap:4px;margin-top:8px;}',
+      '.cv2-pa-btn{flex:1;height:28px;display:flex;align-items:center;justify-content:center;' +
+        'border:1px solid var(--line);border-radius:8px;background:var(--bg-soft);color:var(--ink-dim);' +
+        'cursor:pointer;touch-action:manipulation;transition:border-color .16s var(--ease-yin),color .16s var(--ease-yin);}',
+      '.cv2-pa-btn svg{width:14px;height:14px;}',
+      '.cv2-pa-btn:active{transform:scale(.93);}',
+      '@media(pointer:fine){.cv2-pa-btn:hover{border-color:color-mix(in srgb,var(--accent) 45%,var(--line));color:var(--ink);}}',
+
       /* ── v11.2.37: guías inteligentes (imán) durante el arrastre ── */
       '.cv2-guide{position:absolute;pointer-events:none;z-index:30;display:none;}',
       '.cv2-guide-x{top:-2%;height:104%;width:0;border-left:1px dashed rgba(255,61,127,.95);' +
@@ -9570,6 +9605,13 @@ var CanvasV2UI = (function () {
     circle:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="8"/></svg>',
     frame: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="6" width="16" height="12" rx="1.5"/></svg>',
     image: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"/><circle cx="9.2" cy="9.2" r="1.6"/><path d="m5 18 5-5 3.5 3.5L16 14l4 4"/></svg>',
+    /* v11.2.38: alinear al lienzo (la línea marca el borde de destino) */
+    alLeft:  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 3v18"/><rect x="7" y="6" width="12" height="4" rx="1"/><rect x="7" y="14" width="8" height="4" rx="1"/></svg>',
+    alCenX:  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 3v18"/><rect x="5" y="6" width="14" height="4" rx="1"/><rect x="8" y="14" width="8" height="4" rx="1"/></svg>',
+    alRight: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M20 3v18"/><rect x="5" y="6" width="12" height="4" rx="1"/><rect x="9" y="14" width="8" height="4" rx="1"/></svg>',
+    alTop:   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 4h18"/><rect x="6" y="7" width="4" height="12" rx="1"/><rect x="14" y="7" width="4" height="8" rx="1"/></svg>',
+    alCenY:  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 12h18"/><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="8" width="4" height="8" rx="1"/></svg>',
+    alBot:   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 20h18"/><rect x="6" y="5" width="4" height="12" rx="1"/><rect x="14" y="9" width="4" height="8" rx="1"/></svg>',
     undo:  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-3"/></svg>',
     redo:  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 14 5-5-5-5"/><path d="M20 9H10a6 6 0 0 0 0 12h3"/></svg>',
     dup:   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="8.5" y="8.5" width="11" height="11" rx="2"/><path d="M5 15.5V6a2 2 0 0 1 2-2h8.5"/></svg>',
@@ -9578,6 +9620,11 @@ var CanvasV2UI = (function () {
     eye:   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>',
     trash: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg>'
   };
+  /* v11.2.38: botón de alinear-al-lienzo */
+  function _paBtn(edge, icon, label) {
+    return '<button type="button" class="cv2-pa-btn" data-cv2-action="align-page" data-cv2-edge="' + edge + '" ' +
+      'title="' + _esc(label) + '" aria-label="' + _esc(label) + '">' + _CV_ICONS[icon] + '</button>';
+  }
   function _tool(action, icon, label, cls, disabled) {
     return '<button type="button" class="cv2-tool' + (cls ? ' ' + cls : '') + '" data-cv2-action="' + action + '"' +
       (disabled ? ' disabled' : '') + ' title="' + _esc(label) + '" aria-label="' + _esc(label) + '">' +
@@ -9823,6 +9870,16 @@ var CanvasV2UI = (function () {
            moving is now done by dragging the element on the poster. Keep the
            live X·Y readout (updated during drag). */
         '<div class="cv2-pos-display" id="cv2-pos-disp">X: ' + xVal + ' &middot; Y: ' + yVal + '</div>',
+        /* v11.2.38: alinear al lienzo (como el panel Posición de Canva) */
+        '<div class="cv2-pagealign">',
+          _paBtn('left',   'alLeft',  CanvasV2State.ui('alignLeft')),
+          _paBtn('centerX','alCenX',  CanvasV2State.ui('alignCenter')),
+          _paBtn('right',  'alRight', CanvasV2State.ui('alignRight')),
+          '<span class="cv2-tool-div-v"></span>',
+          _paBtn('top',    'alTop',   CanvasV2State.ui('alignTop')),
+          _paBtn('centerY','alCenY',  CanvasV2State.ui('alignMiddle')),
+          _paBtn('bottom', 'alBot',   CanvasV2State.ui('alignBottom')),
+        '</div>',
       '</div>'
     );
 
@@ -10414,6 +10471,10 @@ var CanvasV2UI = (function () {
         var exBtn = e.target.closest && e.target.closest('.cv2-export-btn');
         if (exBtn) { _handleExportClick(exBtn); return; }
 
+        /* v11.2.38: barra flotante sobre el elemento seleccionado */
+        var fbBtn = e.target.closest && e.target.closest('#cv2-floatbar [data-cv2-action]');
+        if (fbBtn) { _dispatchAction(fbBtn.dataset.cv2Action, fbBtn, handlers); return; }
+
         /* Preview clicks: element selection (+ manual double-click to edit text).
            Use closest() so clicks on inner bits still resolve to the element. */
         var itemEl = e.target.closest && e.target.closest('[data-cv2-id]');
@@ -10451,12 +10512,36 @@ var CanvasV2UI = (function () {
       /* PRIMARY: data-cv2-action dispatch via closest() — robust regardless of inner elements */
       var actionBtn = e.target.closest && e.target.closest('[data-cv2-action]');
       if (actionBtn) {
-        var action = actionBtn.dataset.cv2Action;
+        if (_dispatchAction(actionBtn.dataset.cv2Action, actionBtn, handlers)) return;
+      }
 
+      /* SECONDARY: align buttons */
+      var alignVal = e.target && e.target.dataset && e.target.dataset.align;
+      if (alignVal) {
+        if (window.CanvasV2) window.CanvasV2.updateElement(selId, { align: alignVal });
+        ['cv2-align-left','cv2-align-center','cv2-align-right'].forEach(function(btnId) {
+          var btn = document.getElementById(btnId);
+          if (btn) btn.classList.toggle('cv2-align-on', btn.dataset.align === alignVal);
+        });
+        if (handlers && typeof handlers.onPreviewUpdate === 'function') handlers.onPreviewUpdate();
+        return;
+      }
+
+      _legacyIdControls(e, selId, handlers);
+    }, false);
+
+    /* v11.2.38: el despacho de acciones vive aparte para poder llamarlo también
+       desde la barra flotante que va sobre el elemento seleccionado. */
+    function _dispatchAction(action, actionBtn, handlers) {
+      {
         if (action && action.indexOf('design-') === 0) {
           /* v11.2.32: Mis diseños */
           if (window.CanvasV2Designs) CanvasV2Designs.handleAction(action, actionBtn.dataset.cv2Design);
           return;
+        }
+        if (action === 'align-page') {
+          if (window.CanvasV2 && window.CanvasV2.alignToPage) window.CanvasV2.alignToPage(actionBtn.dataset.cv2Edge);
+          return true;
         }
         if (action === 'history-undo')        { if (window.CanvasV2History) CanvasV2History.undo(); return; }
         if (action === 'history-redo')        { if (window.CanvasV2History) CanvasV2History.redo(); return; }
@@ -10503,22 +10588,12 @@ var CanvasV2UI = (function () {
         }
 
         if (handlers && typeof handlers.onPreviewUpdate === 'function') handlers.onPreviewUpdate();
-        return;
+        return true;
       }
+    }
 
-      /* SECONDARY: align buttons */
-      var alignVal = e.target && e.target.dataset && e.target.dataset.align;
-      if (alignVal) {
-        if (window.CanvasV2) window.CanvasV2.updateElement(selId, { align: alignVal });
-        ['cv2-align-left','cv2-align-center','cv2-align-right'].forEach(function(btnId) {
-          var btn = document.getElementById(btnId);
-          if (btn) btn.classList.toggle('cv2-align-on', btn.dataset.align === alignVal);
-        });
-        if (handlers && typeof handlers.onPreviewUpdate === 'function') handlers.onPreviewUpdate();
-        return;
-      }
-
-      /* TERTIARY: remaining ID-based controls (nudge, size ±1, uppercase, center) */
+    /* Controles antiguos identificados por id (nudge, tamaño ±1, MAYÚS, centrar) */
+    function _legacyIdControls(e, selId, handlers) {
       var tid = e.target.id || '';
       if (!tid) return;
 
@@ -10569,7 +10644,7 @@ var CanvasV2UI = (function () {
       }
 
       if (handlers && typeof handlers.onPreviewUpdate === 'function') handlers.onPreviewUpdate();
-    }, false);
+    }
 
     /* ── dblclick: text element → focus controls textarea (v11.2.3a, no overlay) ── */
     var prevElForDbl = document.getElementById('canvas-v2-preview');
@@ -10603,11 +10678,80 @@ var CanvasV2UI = (function () {
     console.info('[CanvasV2UI] v11.2.3a delegation installed on #canvas-v2-root');
   }
 
+  /* ═════════════════════════════════════════════════════════════
+     v11.2.38 — BARRA FLOTANTE SOBRE LA SELECCIÓN (estilo Canva)
+     Aparece pegada al elemento seleccionado con las acciones que más
+     se usan, en vez de obligar a buscarlas en el panel lateral.
+     Se coloca encima; si no cabe (elemento pegado arriba) salta debajo,
+     y siempre se mantiene dentro del lienzo.
+     ═════════════════════════════════════════════════════════════ */
+  function _fbTool(action, icon, label) {
+    return '<button type="button" class="cv2-fb-btn" data-cv2-action="' + action + '" ' +
+      'title="' + _esc(label) + '" aria-label="' + _esc(label) + '">' + _CV_ICONS[icon] + '</button>';
+  }
+  function ensureFloatBar() {
+    var art = document.getElementById('cv2-artboard');
+    if (!art) return null;
+    var bar = document.getElementById('cv2-floatbar');
+    if (!bar) {
+      bar = document.createElement('div');
+      bar.id = 'cv2-floatbar';
+      bar.className = 'cv2-floatbar';
+      art.appendChild(bar);
+    } else if (bar.parentNode !== art) art.appendChild(bar);
+    var sig = CanvasV2State.getLang();
+    if (bar.dataset.sig !== sig) {
+      bar.dataset.sig = sig;
+      bar.innerHTML =
+        _fbTool('duplicate-selected', 'dup',   CanvasV2State.ui('duplicate')) +
+        _fbTool('bring-forward',      'fwd',   CanvasV2State.ui('forward')) +
+        _fbTool('send-backward',      'back',  CanvasV2State.ui('backward')) +
+        '<span class="cv2-fb-div"></span>' +
+        _fbTool('delete-selected',    'trash', CanvasV2State.ui('deleteEl'));
+    }
+    return bar;
+  }
+  function hideFloatBar() {
+    var bar = document.getElementById('cv2-floatbar');
+    if (bar) bar.style.display = 'none';
+  }
+  function positionFloatBar() {
+    var id = CanvasV2State.getSelectedId();
+    var art = document.getElementById('cv2-artboard');
+    if (!art) return;
+    var node = id ? document.getElementById('cv2-item-' + id) : null;
+    var el = id ? CanvasV2State.getElement(id) : null;
+    if (!id || !node || !el || el.visible === false) { hideFloatBar(); return; }
+    var bar = ensureFloatBar();
+    if (!bar) return;
+    var ar = art.getBoundingClientRect();
+    if (!ar.width || !ar.height) { hideFloatBar(); return; }
+    bar.style.display = 'flex';
+    var nr = node.getBoundingClientRect();
+    /* IMPORTANTE: medir la barra con getBoundingClientRect (igual que el resto) y
+       posicionar en %. offsetWidth/px de estilo NO valen aquí: la vista puede
+       llevar una escala (transición entre pestañas) y mezclar unidades escaladas
+       con no escaladas descentraba la barra. En proporciones la escala se anula. */
+    var br = bar.getBoundingClientRect();
+    var bw = br.width || 150, bh = br.height || 34;
+    var gap = ar.height * 0.014;
+    var top = (nr.top - ar.top) - bh - gap;
+    if (top < 4) top = (nr.bottom - ar.top) + gap;            /* no cabe arriba → debajo */
+    top = Math.max(2, Math.min(ar.height - bh - 2, top));
+    var left = (nr.left - ar.left) + nr.width / 2 - bw / 2;
+    left = Math.max(2, Math.min(ar.width - bw - 2, left));
+    bar.style.top  = (top  / ar.height * 100) + '%';
+    bar.style.left = (left / ar.width  * 100) + '%';
+  }
+
   /* ─────────────────────────────────────────────
      PUBLIC
   ───────────────────────────────────────────── */
   return {
     injectCSS:         injectCSS,
+    ensureFloatBar:    ensureFloatBar,   /* v11.2.38 */
+    positionFloatBar:  positionFloatBar,
+    hideFloatBar:      hideFloatBar,
     buildControlsHTML: buildControlsHTML,
     syncControlValues: syncControlValues,
     renderPreviewHTML: renderPreviewHTML,   /* first paint (builds shell) */
@@ -11533,9 +11677,11 @@ var CanvasV2UI = (function () {
          → el siguiente toque de un dedo parecía un 2º dedo → pinch fantasma).
          Y armar la detección de tap: soltar sin moverse = deseleccionar. */
       delete _activePointers[e.pointerId];
-      /* v11.2.23: tocar Descargar/Compartir no cuenta como "tap en vacío" */
-      var _onExportBar = e.target && e.target.closest && e.target.closest('.cv2-export-bar');
-      if (!_onExportBar) _armBgTap(e);
+      /* v11.2.23/38: tocar la barra de exportar o la barra flotante NO cuenta
+         como "tap en vacío" (si no, deseleccionaría antes de que llegue el click). */
+      var _onBar = e.target && e.target.closest &&
+                   e.target.closest('.cv2-export-bar, #cv2-floatbar');
+      if (!_onBar) _armBgTap(e);
       return;
     }
 
@@ -11705,6 +11851,7 @@ var CanvasV2UI = (function () {
       if (artboard) artboard.classList.remove('cv2-dragging');
     } catch (_) {}
     try { _clearGuides(); } catch (_) {} /* v11.2.37 */
+    try { CanvasV2UI.positionFloatBar(); } catch (_) {} /* v11.2.38: recolocar tras mover */
 
     /* v11.2.18: stop any pending frame + write the authoritative state ONCE here */
     _cancelFrame();
@@ -12113,6 +12260,8 @@ var CanvasV2UI = (function () {
       if (!reconciled) {
         prevEl.innerHTML = CanvasV2UI.renderPreviewHTML(colors, profTxt.chip);
       }
+      /* v11.2.38: la barra flotante sigue a la selección en cada repintado */
+      try { CanvasV2UI.positionFloatBar(); } catch (_) {}
       _lastColorSyncReason = reason || null;
       _lastColorSyncAt     = Date.now();
     },
@@ -12276,6 +12425,36 @@ var CanvasV2UI = (function () {
         try { if (window.AppModules && AppModules.Haptics) AppModules.Haptics.tap(); } catch (_) {}
         console.info('[CanvasV2] imagen añadida →', id, 'ratio', config.ratio);
       } catch (e) { _lastActionOk = false; _lastActionError = String(e); console.warn('[CanvasV2] addImageElement failed', e); }
+    },
+
+    /* ── alignToPage(edge) — v11.2.38: alinear al lienzo ──
+       Mide el borde VISUAL real (las anclas cambian según el elemento:
+       texto centrado/izquierda/derecha, formas centradas) y calcula el
+       valor de posición que deja ese borde pegado al lienzo. */
+    alignToPage: function (edge) {
+      var id = CanvasV2State.getSelectedId();
+      if (!id) return;
+      var el = CanvasV2State.getElement(id);
+      var art = document.getElementById('cv2-artboard');
+      var node = document.getElementById('cv2-item-' + id);
+      if (!el || !art || !node) return;
+      var ar = art.getBoundingClientRect(), nr = node.getBoundingClientRect();
+      if (!ar.width || !ar.height) return;
+      var offX = ((nr.left - ar.left) / ar.width  * 100) - (el.x != null ? el.x : 50);
+      var offY = ((nr.top  - ar.top ) / ar.height * 100) - (el.y != null ? el.y : 50);
+      var w = nr.width / ar.width * 100, h = nr.height / ar.height * 100;
+      var patch = null;
+      if (edge === 'left')         patch = { x: -offX };
+      else if (edge === 'centerX') patch = { x: 50 - offX - w / 2 };
+      else if (edge === 'right')   patch = { x: 100 - offX - w };
+      else if (edge === 'top')     patch = { y: -offY };
+      else if (edge === 'centerY') patch = { y: 50 - offY - h / 2 };
+      else if (edge === 'bottom')  patch = { y: 100 - offY - h };
+      if (!patch) return;
+      CanvasV2.updateElement(id, patch);
+      try { CanvasV2UI.positionFloatBar(); } catch (_) {}
+      try { if (window.AppModules && AppModules.Haptics) AppModules.Haptics.tap(); } catch (_) {}
+      console.info('[CanvasV2] alineado al lienzo:', edge, id);
     },
 
     /* ── setFormat(key) — v11.2.24: post / square / story ──
