@@ -9438,6 +9438,13 @@ var CanvasV2UI = (function () {
       /* ── Disabled button state — v11.2.2a ── */
       '.cv2-btn:disabled,.cv2-btn-sm:disabled{opacity:.32;cursor:not-allowed;}',
 
+      /* ── v11.2.37: guías inteligentes (imán) durante el arrastre ── */
+      '.cv2-guide{position:absolute;pointer-events:none;z-index:30;display:none;}',
+      '.cv2-guide-x{top:-2%;height:104%;width:0;border-left:1px dashed rgba(255,61,127,.95);' +
+        'filter:drop-shadow(0 0 4px rgba(255,61,127,.6));}',
+      '.cv2-guide-y{left:-2%;width:104%;height:0;border-top:1px dashed rgba(255,61,127,.95);' +
+        'filter:drop-shadow(0 0 4px rgba(255,61,127,.6));}',
+
       /* ── Drag cursor — v11.2.0: grabbing cursor during active drag ── */
       '#cv2-artboard.cv2-dragging{cursor:grabbing;}',
       '#cv2-artboard.cv2-dragging .cv2-item{cursor:grabbing!important;}',
@@ -11209,6 +11216,105 @@ var CanvasV2UI = (function () {
   function _clearGesture() {
     if (_gestItem) { try { _gestItem.style.willChange = ''; } catch (_) {} }
     _gestRect = null; _gestItem = null; _gestCtrl = null;
+    _snap.active = false;
+  }
+
+  /* ═════════════════════════════════════════════════════════════
+     v11.2.37 — GUÍAS INTELIGENTES + IMÁN (estilo Canva)
+     Al arrastrar, los bordes y el centro del elemento se enganchan al
+     centro/bordes del lienzo y a los de los demás elementos, con una
+     guía rosa que aparece justo en la línea a la que se ha pegado.
+     Todo se calcula UNA vez al empezar el gesto (los demás no se mueven).
+     ═════════════════════════════════════════════════════════════ */
+  var SNAP_PX = 6;
+  var _snap = { active:false, xs:[], ys:[], offX:0, offY:0, w:0, h:0, tolX:0, tolY:0 };
+
+  function _buildSnapTargets(id) {
+    _snap.active = false;
+    var art = document.getElementById('cv2-artboard');
+    var node = document.getElementById('cv2-item-' + id);
+    var el = CanvasV2State.getElement(id);
+    if (!art || !node || !el) return;
+    var ar = art.getBoundingClientRect();
+    var nr = node.getBoundingClientRect();
+    if (!ar.width || !ar.height) return;
+    /* desfase constante entre el valor de posición y el borde visual
+       (los elementos tienen anclas distintas: centrado, izquierda, etc.) */
+    _snap.offX = ((nr.left - ar.left) / ar.width  * 100) - (el.x != null ? el.x : 50);
+    _snap.offY = ((nr.top  - ar.top ) / ar.height * 100) - (el.y != null ? el.y : 50);
+    _snap.w    = nr.width  / ar.width  * 100;
+    _snap.h    = nr.height / ar.height * 100;
+    _snap.tolX = SNAP_PX / ar.width  * 100;
+    _snap.tolY = SNAP_PX / ar.height * 100;
+    var xs = [50, 0, 100], ys = [50, 0, 100];   /* centro y bordes del lienzo */
+    CanvasV2State.getElementOrder().forEach(function (oid) {
+      if (oid === id) return;
+      var o = CanvasV2State.getElement(oid);
+      if (!o || o.visible === false) return;
+      var on = document.getElementById('cv2-item-' + oid);
+      if (!on) return;
+      var r = on.getBoundingClientRect();
+      if (!r.width && !r.height) return;
+      var l = (r.left - ar.left) / ar.width * 100, rr = (r.right - ar.left) / ar.width * 100;
+      var t = (r.top - ar.top) / ar.height * 100, b = (r.bottom - ar.top) / ar.height * 100;
+      xs.push(l, (l + rr) / 2, rr);
+      ys.push(t, (t + b) / 2, b);
+    });
+    _snap.xs = xs; _snap.ys = ys; _snap.active = true;
+  }
+
+  function _applySnap(x, y) {
+    var res = { x:x, y:y, gx:null, gy:null };
+    if (!_snap.active) return res;
+    var i, a, d, anchors, bestD, bestAdj, bestLine;
+
+    anchors = [x + _snap.offX, x + _snap.offX + _snap.w / 2, x + _snap.offX + _snap.w];
+    bestD = Infinity; bestAdj = 0; bestLine = null;
+    for (i = 0; i < anchors.length; i++) {
+      a = anchors[i];
+      for (var j = 0; j < _snap.xs.length; j++) {
+        d = Math.abs(_snap.xs[j] - a);
+        if (d < _snap.tolX && d < bestD) { bestD = d; bestAdj = _snap.xs[j] - a; bestLine = _snap.xs[j]; }
+      }
+    }
+    if (bestLine !== null) { res.x = x + bestAdj; res.gx = bestLine; }
+
+    anchors = [y + _snap.offY, y + _snap.offY + _snap.h / 2, y + _snap.offY + _snap.h];
+    bestD = Infinity; bestAdj = 0; bestLine = null;
+    for (i = 0; i < anchors.length; i++) {
+      a = anchors[i];
+      for (var k = 0; k < _snap.ys.length; k++) {
+        d = Math.abs(_snap.ys[k] - a);
+        if (d < _snap.tolY && d < bestD) { bestD = d; bestAdj = _snap.ys[k] - a; bestLine = _snap.ys[k]; }
+      }
+    }
+    if (bestLine !== null) { res.y = y + bestAdj; res.gy = bestLine; }
+    return res;
+  }
+
+  function _guideEl(which) {
+    var art = document.getElementById('cv2-artboard'); if (!art) return null;
+    var gid = 'cv2-guide-' + which;
+    var g = document.getElementById(gid);
+    if (!g) { g = document.createElement('div'); g.id = gid; g.className = 'cv2-guide cv2-guide-' + which; art.appendChild(g); }
+    else if (g.parentNode !== art) art.appendChild(g);
+    return g;
+  }
+  /* Las guías se pintan SIN pasar por requestAnimationFrame: son dos escrituras
+     de estilo triviales y sólo se tocan cuando la línea CAMBIA, así que no hay
+     coste real — y a cambio aparecen en el mismo instante en que el elemento se
+     engancha (con rAF llegaban un frame tarde y se veían "flojas"). */
+  var _lastGx, _lastGy;
+  function _drawGuides(gx, gy) {
+    if (gx === _lastGx && gy === _lastGy) return;
+    _lastGx = gx; _lastGy = gy;
+    var vx = _guideEl('x'), vy = _guideEl('y');
+    if (vx) { if (gx == null) vx.style.display = 'none'; else { vx.style.display = 'block'; vx.style.left = gx + '%'; } }
+    if (vy) { if (gy == null) vy.style.display = 'none'; else { vy.style.display = 'block'; vy.style.top  = gy + '%'; } }
+  }
+  function _clearGuides() {
+    _lastGx = _lastGy = undefined;
+    ['x','y'].forEach(function (w) { var g = document.getElementById('cv2-guide-' + w); if (g) g.style.display = 'none'; });
   }
   function _writePos(newX, newY) {
     if (_gestItem) { _gestItem.style.left = newX + '%'; _gestItem.style.top = newY + '%'; }
@@ -11345,7 +11451,52 @@ var CanvasV2UI = (function () {
     prevEl.dataset.cv2DragInstalled = '1';
     prevEl.addEventListener('pointerdown', _onDragPointerDown,   false); /* drag */
     prevEl.addEventListener('pointerdown', _onResizePointerDown, false); /* resize */
+    _installKeyboard(); /* v11.2.37 */
     console.info('[CanvasV2] v11.2.1 drag + resize listeners installed on #canvas-v2-preview');
+  }
+
+  /* ── v11.2.37: atajos de teclado del lienzo (como en Canva) ──
+     Flechas mueven (Shift = a saltos), Supr borra, Cmd/Ctrl+D duplica,
+     Esc deselecciona. Nunca roban teclas mientras se escribe. */
+  var _kbInstalled = false;
+  function _installKeyboard() {
+    if (_kbInstalled) return;
+    _kbInstalled = true;
+    document.addEventListener('keydown', function (e) {
+      var view = document.getElementById('view-canvas');
+      if (!view || !view.classList.contains('active')) return;
+      var t = e.target;
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+      if (_isEditingText()) return;
+      var id = CanvasV2State.getSelectedId();
+      var k = e.key;
+
+      if (k === 'ArrowLeft' || k === 'ArrowRight' || k === 'ArrowUp' || k === 'ArrowDown') {
+        if (!id) return;
+        var el = CanvasV2State.getElement(id); if (!el) return;
+        var st = e.shiftKey ? 4 : 0.5;
+        var nx = (el.x != null ? el.x : 50), ny = (el.y != null ? el.y : 50);
+        if (k === 'ArrowLeft')  nx -= st;
+        if (k === 'ArrowRight') nx += st;
+        if (k === 'ArrowUp')    ny -= st;
+        if (k === 'ArrowDown')  ny += st;
+        e.preventDefault();
+        CanvasV2.updateElement(id, { x: Math.max(0, Math.min(100, nx)), y: Math.max(0, Math.min(100, ny)) });
+        return;
+      }
+      if (k === 'Delete' || k === 'Backspace') {
+        if (!id) return;
+        e.preventDefault(); CanvasV2.deleteSelected(); return;
+      }
+      if (k === 'Escape') {
+        if (id) { e.preventDefault(); CanvasV2.deselect(); }
+        return;
+      }
+      if ((e.metaKey || e.ctrlKey) && String(k).toLowerCase() === 'd') {
+        if (!id) return;
+        e.preventDefault(); CanvasV2.duplicateSelected(); return;
+      }
+    }, false);
   }
 
   function _onDragPointerDown(e) {
@@ -11479,6 +11630,7 @@ var CanvasV2UI = (function () {
       var artForCursor = document.getElementById('cv2-artboard');
       if (artForCursor) artForCursor.classList.add('cv2-dragging');
       _cacheGesture(_drag.id); /* v11.2.18: cache rect + el + controls ONCE */
+      _buildSnapTargets(_drag.id); /* v11.2.37: líneas de imán, una sola vez */
     }
 
     /* v11.2.18: use the rect cached at gesture start — no getBoundingClientRect per move */
@@ -11492,12 +11644,20 @@ var CanvasV2UI = (function () {
     var newX = Math.min(100, Math.max(0, isNaN(rawX) ? _drag.startElX : rawX));
     var newY = Math.min(100, Math.max(0, isNaN(rawY) ? _drag.startElY : rawY));
 
+    /* v11.2.37: imán a centro/bordes del lienzo y de los demás elementos */
+    var snapped = _applySnap(newX, newY);
+    newX = Math.min(100, Math.max(0, snapped.x));
+    newY = Math.min(100, Math.max(0, snapped.y));
+
     _drag.moved            = true;
     _drag.curX             = newX;
     _drag.curY             = newY;
+    _drag.gx               = snapped.gx;
+    _drag.gy               = snapped.gy;
     _drag.lastDragDelta    = { dx: Math.round(dx), dy: Math.round(dy) };
     _drag.lastDragPosition = { x: Math.round(newX * 10) / 10, y: Math.round(newY * 10) / 10 };
 
+    _drawGuides(_drag.gx, _drag.gy); /* v11.2.37: inmediato, no espera frame */
     /* v11.2.18: coalesce DOM writes to one per frame (state is written on pointerup) */
     _requestFrame(function () { _writePos(_drag.curX, _drag.curY); });
   }
@@ -11544,6 +11704,7 @@ var CanvasV2UI = (function () {
       var artboard = document.getElementById('cv2-artboard');
       if (artboard) artboard.classList.remove('cv2-dragging');
     } catch (_) {}
+    try { _clearGuides(); } catch (_) {} /* v11.2.37 */
 
     /* v11.2.18: stop any pending frame + write the authoritative state ONCE here */
     _cancelFrame();
@@ -12689,6 +12850,13 @@ var CanvasV2UI = (function () {
       activeResizeId:       _resize.id,
       activePinchId:        _pinch.id,
       activePointerCount:   Object.keys(_activePointers).length,
+      /* v11.2.37: diagnóstico del imán/guías */
+      snapActive:           _snap.active,
+      snapTargetsX:         _snap.xs.length,
+      snapTargetsY:         _snap.ys.length,
+      snapTolXPct:          Math.round(_snap.tolX * 1000) / 1000,
+      snapLastGuideX:       _drag.gx,
+      snapLastGuideY:       _drag.gy,
       /* drag diagnostics */
       lastDragId:           _drag.lastDragId,
       lastDragSaved:        _drag.lastDragSaved,
